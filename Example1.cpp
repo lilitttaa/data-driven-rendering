@@ -87,7 +87,15 @@ struct StringRef
 		                         : buffer_size;
 		for (size_t i = 0; i < copy_size; ++i) { buffer[i] = a.text[i]; }
 	}
+
+	friend std::ostream& operator<<(std::ostream& os, const StringRef& str);
 }; // struct StringRef
+
+std::ostream& operator<<(std::ostream& os, const StringRef& str)
+{
+	for (size_t i = 0; i < str.length; ++i) { os << str.text[i]; }
+	return os;
+}
 
 // typedef std::string StringRef; //TODO
 // template <typename T>
@@ -136,6 +144,28 @@ enum class ShaderStage
 	Vertex = 0, Fragment, Geometry, Compute, Hull, Domain, Count
 };
 
+std::ostream& operator<<(std::ostream& os, const ShaderStage& stage)
+{
+	switch (stage)
+	{
+		case ShaderStage::Vertex: { os << "Vertex"; }
+		break;
+		case ShaderStage::Fragment: { os << "Fragment"; }
+		break;
+		case ShaderStage::Geometry: { os << "Geometry"; }
+		break;
+		case ShaderStage::Compute: { os << "Compute"; }
+		break;
+		case ShaderStage::Hull: { os << "Hull"; }
+		break;
+		case ShaderStage::Domain: { os << "Domain"; }
+		break;
+		case ShaderStage::Count: { os << "Count"; }
+		break;
+	}
+	return os;
+}
+
 bool expectKeyword(const StringRef& text, const std::string& expected_keyword)
 {
 	if (text.length != expected_keyword.length())
@@ -159,7 +189,7 @@ public:
 	bool IsAlpha(char c) { return ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')); }
 	bool IsNumber(char c) { return (c >= '0' && c <= '9'); }
 
-	void skip_whitespace()
+	void skipWhitespace()
 	{
 		// Scan text until whitespace is finished.
 		for (;;)
@@ -260,10 +290,10 @@ public:
 		// add_data(data_buffer, parsed_number); //TODO
 	}
 
-	void next_token(Token& token)
+	void nextToken(Token& token)
 	{
 		// Skip all whitespace first so that the token is without them.
-		skip_whitespace();
+		skipWhitespace();
 
 		// Initialize token
 		token.type = TokenType::Token_Unknown;
@@ -350,7 +380,7 @@ public:
 
 	bool equalToken(Token& token, TokenType expected_type)
 	{
-		next_token(token);
+		nextToken(token);
 		return token.type == expected_type;
 	}
 
@@ -360,7 +390,7 @@ public:
 		if (hasError)
 			return true;
 
-		next_token(token);
+		nextToken(token);
 		hasError = token.type != expected_type;
 		if (hasError)
 		{
@@ -403,12 +433,6 @@ struct CodeFragment
 	uint32_t stage_ifdef_depth[ShaderStage::Count];
 };
 
-struct Shader
-{
-	StringRef name;
-	std::vector<CodeFragment> codeFragments;
-};
-
 struct Pass
 {
 	struct Stage
@@ -426,14 +450,51 @@ struct Pass
 	// const RenderState* render_state;
 }; // struct Pass
 
+struct Shader
+{
+	StringRef name;
+	std::vector<CodeFragment> codeFragments;
+	std::vector<Pass> passes;
+
+	void ShowShader()
+	{
+		std::cout << "Shader: " << name << std::endl;
+		// std::cout << "Test" << std::endl;
+		for (const auto& codeFragment : codeFragments)
+		{
+			std::cout << "CodeFragment: " << codeFragment.name << std::endl;
+			std::cout << "Code: " << codeFragment.code << std::endl;
+			std::cout << "Ifdef Depth: " << codeFragment.ifdef_depth << std::endl;
+			std::cout << "Current Stage: " << static_cast<uint32_t>(codeFragment.current_stage) << std::endl;
+			for (const auto& resource : codeFragment.resources) { std::cout << "Resource: " << resource.name << std::endl; }
+			for (const auto& include : codeFragment.includes) { std::cout << "Include: " << include << std::endl; }
+			for (const auto& include_flag : codeFragment.includes_flags) { std::cout << "Include Flag: " << include_flag << std::endl; }
+			for (size_t i = 0; i < static_cast<uint32_t>(ShaderStage::Count); i++)
+			{
+				std::cout << "Stage Ifdef Depth: " << codeFragment.stage_ifdef_depth[i] << std::endl;
+			}
+		}
+		for (const auto& pass : passes)
+		{
+			std::cout << "Pass: " << pass.name << std::endl;
+			for (const auto& shader_stage : pass.shader_stages)
+			{
+				std::cout << shader_stage.stage << "---" << shader_stage.code->name << std::endl;
+				std::cout << "shader_stage.code->code: " << shader_stage.code->code << std::endl;
+			}
+		}
+	}
+};
+
 class Parser
 {
 public:
 	Parser(Lexer& lexer): lexer(lexer) {}
 
+	Shader shader;
+
 protected:
 	Lexer& lexer;
-	Shader shader;
 
 public:
 	void generateAST()
@@ -445,8 +506,7 @@ public:
 		while (parsing)
 		{
 			Token token;
-			// nextToken(parser->lexer, token);
-			lexer.next_token(token);
+			lexer.nextToken(token);
 
 			switch (token.type)
 			{
@@ -467,11 +527,9 @@ public:
 
 	inline void declarationShader()
 	{
-		// Parse name
 		Token token;
 		if (!lexer.expectToken(token, TokenType::Token_Identifier)) { return; }
 
-		// Cache name string
 		shader.name = token.text;
 
 		if (!lexer.expectToken(token, TokenType::Token_OpenBrace)) { return; }
@@ -493,11 +551,11 @@ public:
 					// Search for the pattern 'if defined'
 					if (expectKeyword(token.text, "if"))
 					{
-						lexer.next_token(new_token);
+						lexer.nextToken(new_token);
 
 						if (expectKeyword(new_token.text, "defined"))
 						{
-							lexer.next_token(new_token);
+							lexer.nextToken(new_token);
 
 							// Use 0 as not set value for the ifdef depth.
 							++code_fragment.ifdef_depth;
@@ -528,18 +586,18 @@ public:
 				{
 					if (expectKeyword(token.text, "pragma"))
 					{
-						lexer.next_token(new_token);
+						lexer.nextToken(new_token);
 
 						if (expectKeyword(new_token.text, "include"))
 						{
-							lexer.next_token(new_token);
+							lexer.nextToken(new_token);
 
 							code_fragment.includes.emplace_back(new_token.text);
 							code_fragment.includes_flags.emplace_back((uint32_t)code_fragment.current_stage);
 						}
 						else if (expectKeyword(new_token.text, "include_hfx"))
 						{
-							lexer.next_token(new_token);
+							lexer.nextToken(new_token);
 
 							code_fragment.includes.emplace_back(new_token.text);
 							uint32_t flag = (uint32_t)code_fragment.current_stage | 0x10; // 0x10 = local hfx.
@@ -595,7 +653,7 @@ public:
 					{
 						// Advance to next token to get the name
 						Token name_token;
-						lexer.next_token(name_token);
+						lexer.nextToken(name_token);
 
 						CodeFragment::Resource resource = {ResourceType::TextureRW, name_token.text};
 						code_fragment.resources.emplace_back(resource);
@@ -609,7 +667,7 @@ public:
 					{
 						// Advance to next token to get the name
 						Token name_token;
-						lexer.next_token(name_token);
+						lexer.nextToken(name_token);
 
 						CodeFragment::Resource resource = {ResourceType::Texture, name_token.text};
 						code_fragment.resources.emplace_back(resource);
@@ -634,7 +692,7 @@ public:
 		if (!lexer.expectToken(token, TokenType::Token_OpenBrace)) { return; }
 
 		// Advance token and cache the starting point of the code.
-		lexer.next_token(token);
+		lexer.nextToken(token);
 		code_fragment.code = token.text;
 
 		uint32_t open_braces = 1;
@@ -651,7 +709,7 @@ public:
 			if (token.type == TokenType::Token_Hash)
 			{
 				// Get next token and check which directive is
-				lexer.next_token(token);
+				lexer.nextToken(token);
 
 				directive_identifier(token, code_fragment);
 			}
@@ -660,7 +718,7 @@ public:
 				// Parse uniforms to add resource dependencies if not explicit in the HFX file.
 				if (expectKeyword(token.text, "uniform"))
 				{
-					lexer.next_token(token);
+					lexer.nextToken(token);
 
 					uniform_identifier(token, code_fragment);
 				}
@@ -668,7 +726,7 @@ public:
 
 			// Only advance token when we are inside the glsl braces, otherwise will skip the following glsl part.
 			if (open_braces)
-				lexer.next_token(token);
+				lexer.nextToken(token);
 		}
 
 		// Calculate code string length using the token before the last close brace.
@@ -691,11 +749,11 @@ public:
 					// Search for the pattern 'if defined'
 					if (expectKeyword(token.text, "if"))
 					{
-						parser->lexer.next_token(new_token);
+						parser->lexer.nextToken(new_token);
 
 						if (expectKeyword(new_token.text, "defined"))
 						{
-							parser->lexer.next_token(new_token);
+							parser->lexer.nextToken(new_token);
 
 							// Use 0 as not set value for the ifdef depth.
 							++code_fragment.ifdef_depth;
@@ -725,11 +783,11 @@ public:
 				{
 					if (expectKeyword(token.text, "pragma"))
 					{
-						parser->lexer.next_token(new_token);
+						parser->lexer.nextToken(new_token);
 
 						if (expectKeyword(new_token.text, "include"))
 						{
-							parser->lexer.next_token(new_token);
+							parser->lexer.nextToken(new_token);
 
 							code_fragment.includes.emplace_back(new_token.text);
 							code_fragment.includes_flags.emplace_back(static_cast<uint32_t>(code_fragment.current_stage));
@@ -838,6 +896,7 @@ public:
 
 		if (!lexer.expectToken(token, TokenType::Token_OpenBrace)) { return; }
 		while (!lexer.equalToken(token, TokenType::Token_CloseBrace)) { passIdentifier(token, pass); }
+		shader.passes.emplace_back(pass);
 	}
 
 	inline void identifier(const Token& token)
@@ -893,7 +952,50 @@ public:
 };
 
 class CodeGenerator
-{};
+{
+public:
+	CodeGenerator(Parser& parser): parser(parser), string_buffers(3) {}
+
+	void generateShaderPermutations(const std::string& path)
+	{
+		string_buffers[0].clear();
+		string_buffers[1].clear();
+		string_buffers[2].clear();
+
+		// For each pass and for each pass generate permutation file.
+		const uint32_t pass_count = (uint32_t)parser.shader.passes.size();
+		for ( uint32_t i = 0; i < pass_count; i++ ) {
+
+			// Create one file for each code fragment
+			const Pass& pass = parser.shader.passes[i];
+
+			for ( size_t s = 0; s < pass.shader_stages.size(); ++s ) {
+				output_shader_stage( path, pass.shader_stages[s] );
+			}
+		}
+	}
+
+	void output_shader_stage(const std::string& path, const Pass::Stage& stage)
+    {
+        const CodeFragment* code_fragment = stage.code;
+        if (code_fragment == nullptr)
+            return;
+
+        // Generate the permutation file
+        // const char* stage_name = get_shader_stage_name( stage.stage );
+        // const char* stage_extension = get_shader_stage_extension( stage.stage );
+
+        // StringRef::copy( code_fragment->code, string_buffers[0].data(), string_buffers[0].size() );
+        // StringRef::copy( code_fragment->name, string_buffers[1].data(), string_buffers[1].size() );
+
+        // const char* output_path = path + string_buffers[1].data() + "_" + stage_name + stage_extension;
+        // write_file( output_path, string_buffers[0].data(), string_buffers[0].size() );
+    }
+
+protected:
+	Parser& parser;
+	std::vector<std::string> string_buffers;
+};
 }
 
 void compileHFX()
@@ -902,15 +1004,18 @@ void compileHFX()
 	LoadFileToStr(GetHFXDir() + "SimpleFullscreen.hfx", simpleFullscreenSourceStr);
 	// copy the string into a text char*
 	uint32_t allocated_size = simpleFullscreenSourceStr.size() + 1;
-	char* text = new char[allocated_size];
+	char* text = new char[allocated_size]; //TODO: free this memory
 	memcpy(text, simpleFullscreenSourceStr.c_str(), allocated_size);
 
 	HFX::Lexer lexer(text);
 	HFX::Parser parser(lexer);
 	parser.generateAST();
+	parser.shader.ShowShader();
 
-	// HFX::CodeGenerator code_generator(parser);
-	// code_generator.generateShaderPermutations(outputDir);
+	delete[] text;
+
+	HFX::CodeGenerator code_generator(parser);
+	code_generator.generateShaderPermutations("");
 
 	// const char* vertexShaderSource = vertexShaderSourceStr.c_str();
 
@@ -935,7 +1040,6 @@ public:
 
 	virtual void Init() override
 	{
-		compileHFX();
 // glfw: initialize and configure
 		// ------------------------------
 		glfwInit();
@@ -1140,4 +1244,20 @@ protected:
 	Ball ball = {100.0f, 300.0f, 300.0f, 1000.0f, 150.0f};
 };
 
-ST::Application* CreateApplication() { return new Example1(); }
+class Example2 : public ST::Application
+{
+public:
+	Example2(): ST::Application() {}
+
+	~Example2() override {}
+
+	virtual void Init() override { compileHFX(); }
+
+	virtual void Tick(float deltaTime) override {}
+
+	virtual void Render(float deltaTime) override {}
+
+	virtual void Destroy() override {}
+};
+
+ST::Application* CreateApplication() { return new Example2(); }
