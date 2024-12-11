@@ -778,62 +778,35 @@ const CodeFragment* Parser::findCodeFragment(const StringRef& name)
 
 void compileHFX(const std::string& filePath)
 {
-	std::cout<<"Compiling HFX file: "<<filePath<<std::endl;
-	// Load HFX file
-	// FileReader fileReader(filePath);
-	// std::string hfxSourceStr = fileReader.Read();
-	//
-	// Lexer lexer(hfxSourceStr);
-	// Parser parser(lexer);
-	// parser.generateAST();
-	// ast.Print();
-	// HFX::ShaderGenerator shaderGenerator(ast);
-	// shaderGenerator.Generate();
-	// for (auto& shader : shaderGenerator.GetShaders())
-	// {
-	// 	std::string fileName = shader.GetName() + ".glsl";
-	// 	FileWriter fileWriter(fileName);
-	// 	fileWriter.Write(shader.GetSource());
-	// }
-
-	// Init Lexer
-	// Init Parser
-	// Generate AST
-	// Print AST
-	// Generate Shaders
-
-	FileReader fileReader(filePath);
-	const std::string hfxSourceStr = fileReader.Read();
-
-	Lexer lexer(hfxSourceStr);
+	Lexer lexer(FileReader(filePath).Read());
 	Parser parser(lexer);
 	parser.generateAST();
 	AST& ast = parser.getAST();
 	ast.Print();
-	CodeGenerator code_generator(parser);
-	code_generator.generateShaderPermutations(ST::PathManager::GetHFXDir());
+	ShaderGenerator shaderGenerator(ast);
+	shaderGenerator.generateShaders(ST::PathManager::GetHFXDir());
 }
 
-CodeGenerator::CodeGenerator(Parser& parser): parser(parser), string_buffers(3) {}
+ShaderGenerator::ShaderGenerator(const AST& ast): ast(ast), string_buffers(3) {}
 
-void CodeGenerator::generateShaderPermutations(const std::string& path)
+void ShaderGenerator::generateShaders(const std::string& path)
 {
 	string_buffers[0].clear();
 	string_buffers[1].clear();
 	string_buffers[2].clear();
 
 	// For each pass and for each pass generate permutation file.
-	const uint32_t pass_count = (uint32_t)parser.getAST().passes.size();
+	const uint32_t pass_count = (uint32_t)ast.passes.size();
 	for (uint32_t i = 0; i < pass_count; i++)
 	{
 		// Create one file for each code fragment
-		const Pass& pass = parser.getAST().passes[i];
+		const Pass& pass = ast.passes[i];
 
 		for (size_t s = 0; s < pass.shader_stages.size(); ++s) { output_shader_stage(path, pass.shader_stages[s]); }
 	}
 }
 
-void CodeGenerator::output_shader_stage(const std::string& path, const Pass::Stage& stage)
+void ShaderGenerator::output_shader_stage(const std::string& path, const Pass::Stage& stage)
 {
 	const CodeFragment* code_fragment = stage.code;
 	if (code_fragment == nullptr)

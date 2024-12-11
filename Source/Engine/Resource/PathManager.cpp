@@ -19,7 +19,6 @@ ST::ST_STRING ST::PathManager::GetShaderDir() { return GetProjectDir() + "Resour
 
 ST::ST_STRING ST::PathManager::GetHFXDir()
 {
-	std::cout << "GetHFXDir" << std::endl;
 	return PathManager::GetProjectDir() + "Resource/HFX/";
 }
 

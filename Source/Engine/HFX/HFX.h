@@ -163,9 +163,6 @@ protected:
 	uint32_t errorLine;
 };
 
-// struct AST
-// {};
-
 class Parser
 {
 public:
@@ -201,17 +198,17 @@ public:
 	const CodeFragment* findCodeFragment(const StringRef& name);
 };
 
-class CodeGenerator
+class ShaderGenerator
 {
 public:
-	CodeGenerator(Parser& parser);
+	ShaderGenerator(const AST& ast);
 
-	void generateShaderPermutations(const std::string& path);
+	void generateShaders(const std::string& path);
 
 	void output_shader_stage(const std::string& path, const Pass::Stage& stage);
 
 protected:
-	Parser& parser;
+	const AST& ast;
 	std::vector<std::string> string_buffers;
 };
 
