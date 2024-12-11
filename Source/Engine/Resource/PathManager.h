@@ -1,11 +1,21 @@
 ﻿#pragma once
 
+#include <direct.h>
+
 #include "Core.h"
 
-namespace ST {
-class PathManager {
+namespace ST
+{
+class PathManager
+{
 public:
 	static ST_STRING GetProjectDir();
+
+	static ST_STRING GetShaderDir();
+
+	static ST_STRING GetHFXDir();
+
+	static ST_STRING GetHFXGeneratedDir();
 
 	static ST_STRING GetResourcePath();
 

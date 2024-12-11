@@ -201,5 +201,19 @@ public:
 	const CodeFragment* findCodeFragment(const StringRef& name);
 };
 
+class CodeGenerator
+{
+public:
+	CodeGenerator(Parser& parser);
+
+	void generateShaderPermutations(const std::string& path);
+
+	void output_shader_stage(const std::string& path, const Pass::Stage& stage);
+
+protected:
+	Parser& parser;
+	std::vector<std::string> string_buffers;
+};
+
 void compileHFX(const std::string& filePath);
 }

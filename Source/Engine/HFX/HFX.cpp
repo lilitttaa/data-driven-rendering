@@ -5,6 +5,7 @@
 #include <vector>
 #include "HFX.h"
 
+#include "PathManager.h"
 #include "File/FileReader.h"
 
 // typedef std::string StringRef; //TODO
@@ -327,10 +328,7 @@ void Lexer::parseNumber()
 
 void Parser::generateAST()
 {
-	// Read source text until the end.
-	// The main body can be a list of declarations.
 	bool parsing = true;
-
 	while (parsing)
 	{
 		Token token;
@@ -780,13 +778,14 @@ const CodeFragment* Parser::findCodeFragment(const StringRef& name)
 
 void compileHFX(const std::string& filePath)
 {
+	std::cout<<"Compiling HFX file: "<<filePath<<std::endl;
 	// Load HFX file
-	FileReader fileReader(filePath);
-	std::string hfxSourceStr = fileReader.Read();
-
-	Lexer lexer(hfxSourceStr);
-	Parser parser(lexer);
-	parser.generateAST();
+	// FileReader fileReader(filePath);
+	// std::string hfxSourceStr = fileReader.Read();
+	//
+	// Lexer lexer(hfxSourceStr);
+	// Parser parser(lexer);
+	// parser.generateAST();
 	// ast.Print();
 	// HFX::ShaderGenerator shaderGenerator(ast);
 	// shaderGenerator.Generate();
@@ -803,72 +802,64 @@ void compileHFX(const std::string& filePath)
 	// Print AST
 	// Generate Shaders
 
-	// std::string simpleFullscreenSourceStr;
-	// LoadFileToStr(GetHFXDir() + "Ball.hfx", simpleFullscreenSourceStr);
-	// // copy the string into a text char*
-	// uint32_t allocated_size = simpleFullscreenSourceStr.size() + 1;
-	// char* text = new char[allocated_size]; //TODO: free this memory
-	// memcpy(text, simpleFullscreenSourceStr.c_str(), allocated_size);
-	//
-	// HFX::Lexer lexer(text);
-	// HFX::Parser parser(lexer);
-	// parser.generateAST();
-	// parser.shader.ShowShader();
-	//
-	// HFX::CodeGenerator code_generator(parser);
-	// code_generator.generateShaderPermutations(GetHFXDir());
-	// delete[] text;
+	FileReader fileReader(filePath);
+	std::string hfxSourceStr = fileReader.Read();
+	// copy the string into a text char*
+	uint32_t allocated_size = hfxSourceStr.size() + 1;
+	char* text = new char[allocated_size]; //TODO: free this memory
+	memcpy(text, hfxSourceStr.c_str(), allocated_size);
+
+	HFX::Lexer lexer(hfxSourceStr);
+	HFX::Parser parser(lexer);
+	parser.generateAST();
+	parser.shader.ShowShader();
+
+	HFX::CodeGenerator code_generator(parser);
+	code_generator.generateShaderPermutations(ST::PathManager::GetHFXDir());
+	delete[] text;
 }
 
-class CodeGenerator
+CodeGenerator::CodeGenerator(Parser& parser): parser(parser), string_buffers(3) {}
+
+void CodeGenerator::generateShaderPermutations(const std::string& path)
 {
-public:
-	CodeGenerator(Parser& parser): parser(parser), string_buffers(3) {}
+	string_buffers[0].clear();
+	string_buffers[1].clear();
+	string_buffers[2].clear();
 
-	void generateShaderPermutations(const std::string& path)
+	// For each pass and for each pass generate permutation file.
+	const uint32_t pass_count = (uint32_t)parser.shader.passes.size();
+	for (uint32_t i = 0; i < pass_count; i++)
 	{
-		string_buffers[0].clear();
-		string_buffers[1].clear();
-		string_buffers[2].clear();
+		// Create one file for each code fragment
+		const Pass& pass = parser.shader.passes[i];
 
-		// For each pass and for each pass generate permutation file.
-		const uint32_t pass_count = (uint32_t)parser.shader.passes.size();
-		for (uint32_t i = 0; i < pass_count; i++)
-		{
-			// Create one file for each code fragment
-			const Pass& pass = parser.shader.passes[i];
-
-			for (size_t s = 0; s < pass.shader_stages.size(); ++s) { output_shader_stage(path, pass.shader_stages[s]); }
-		}
+		for (size_t s = 0; s < pass.shader_stages.size(); ++s) { output_shader_stage(path, pass.shader_stages[s]); }
 	}
+}
 
-	void output_shader_stage(const std::string& path, const Pass::Stage& stage)
-	{
-		const CodeFragment* code_fragment = stage.code;
-		if (code_fragment == nullptr)
-			return;
+void CodeGenerator::output_shader_stage(const std::string& path, const Pass::Stage& stage)
+{
+	const CodeFragment* code_fragment = stage.code;
+	if (code_fragment == nullptr)
+		return;
 
-		std::string fileName = path + code_fragment->name.to_string() + "_" + ShaderStage2Postfix(stage.stage) + ".glsl";
-		std::ofstream file(fileName);
-		std::string code = code_fragment->code.to_string();
-		file << "#version 330 core\n";
-		file << "#define " << ShaderStage2String(stage.stage) << "\n";
-		file << code;
-		file.close();
+	std::string fileName = path + code_fragment->name.to_string() + "_" + ShaderStage2Postfix(stage.stage) + ".glsl";
+	std::ofstream file(fileName);
+	std::string code = code_fragment->code.to_string();
+	file << "#version 330 core\n";
+	file << "#define " << ShaderStage2String(stage.stage) << "\n";
+	file << code;
+	file.close();
 
-		// Generate the permutation file
-		// const char* stage_name = get_shader_stage_name( stage.stage );
-		// const char* stage_extension = get_shader_stage_extension( stage.stage );
+	// Generate the permutation file
+	// const char* stage_name = get_shader_stage_name( stage.stage );
+	// const char* stage_extension = get_shader_stage_extension( stage.stage );
 
-		// StringRef::copy( code_fragment->code, string_buffers[0].data(), string_buffers[0].size() );
-		// StringRef::copy( code_fragment->name, string_buffers[1].data(), string_buffers[1].size() );
+	// StringRef::copy( code_fragment->code, string_buffers[0].data(), string_buffers[0].size() );
+	// StringRef::copy( code_fragment->name, string_buffers[1].data(), string_buffers[1].size() );
 
-		// const char* output_path = path + string_buffers[1].data() + "_" + stage_name + stage_extension;
-		// write_file( output_path, string_buffers[0].data(), string_buffers[0].size() );
-	}
-
-protected:
-	Parser& parser;
-	std::vector<std::string> string_buffers;
-};
+	// const char* output_path = path + string_buffers[1].data() + "_" + stage_name + stage_extension;
+	// write_file( output_path, string_buffers[0].data(), string_buffers[0].size() );
+}
 }

@@ -1,6 +1,7 @@
 #include <direct.h>
 #include <iostream>
 #include "Application.h"
+#include "PathManager.h"
 #include "glad/glad.h"
 #include "GLFW/glfw3.h"
 #include "gtc/type_ptr.hpp"
@@ -10,25 +11,6 @@ using namespace ST;
 
 const unsigned int SCR_WIDTH = 800;
 const unsigned int SCR_HEIGHT = 600;
-
-std::string GetProjectDir()
-{
-	char buffer[256];
-	char* dicPath = _getcwd(buffer, sizeof(buffer));
-	char* ret = dicPath;
-	for (; *dicPath != '\0'; ++dicPath)
-	{
-		if (*dicPath == '\\')
-			*dicPath = '/';
-	}
-	return std::string(ret) + "/../";
-}
-
-std::string GetShaderDir() { return GetProjectDir() + "Resource/OpenGLShader/"; }
-
-std::string GetHFXDir() { return GetProjectDir() + "Resource/HFX/"; }
-
-std::string GetHFXGeneratedDir() { return GetProjectDir() + "Resource/HFX/Generated/"; }
 
 bool LoadFileToStr(std::string filePath, std::string& outStr)
 {
@@ -66,8 +48,6 @@ struct Ball
 	float velocityX, velocityY;
 };
 
-
-
 class Example1 : public ST::Application
 {
 public:
@@ -77,7 +57,7 @@ public:
 
 	virtual void Init() override
 	{
-		HFX::compileHFX(GetHFXDir() + "Ball.hfx");
+		HFX::compileHFX(PathManager::GetHFXDir() + "Ball.hfx");
 // glfw: initialize and configure
 		// ------------------------------
 		glfwInit();
@@ -110,11 +90,11 @@ public:
 		}
 
 		std::string vertexShaderSourceStr;
-		LoadFileToStr(GetHFXDir() + "Ball_vt.glsl", vertexShaderSourceStr);
+		LoadFileToStr(PathManager::GetHFXDir() + "Ball_vt.glsl", vertexShaderSourceStr);
 		const char* vertexShaderSource = vertexShaderSourceStr.c_str();
 
 		std::string fragmentShaderSourceStr;
-		LoadFileToStr(GetHFXDir() + "Ball_fg.glsl", fragmentShaderSourceStr);
+		LoadFileToStr(PathManager::GetHFXDir() + "Ball_fg.glsl", fragmentShaderSourceStr);
 		const char* fragmentShaderSource = fragmentShaderSourceStr.c_str();
 
 		// build and compile our shader program
