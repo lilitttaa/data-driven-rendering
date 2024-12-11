@@ -4,13 +4,8 @@
 #include <ostream>
 #include <vector>
 #include "HFX.h"
-
 #include "PathManager.h"
 #include "File/FileReader.h"
-
-// typedef std::string StringRef; //TODO
-// template <typename T>
-// typedef std::vector<T> VectorRef; //TODO
 
 namespace HFX
 {
@@ -43,7 +38,7 @@ std::ostream& operator<<(std::ostream& os, const ShaderStage& stage)
 	return os;
 }
 
-bool expectKeyword(const StringRef& text, const std::string& expected_keyword)
+bool ExpectKeyword(const IndirecString& text, const std::string& expected_keyword)
 {
 	if (text.length != expected_keyword.length())
 		return false;
@@ -56,7 +51,7 @@ bool expectKeyword(const StringRef& text, const std::string& expected_keyword)
 	return true;
 }
 
-bool StringRef::equals(const StringRef& a, const StringRef& b)
+bool IndirecString::Equals(const IndirecString& a, const IndirecString& b)
 {
 	if (a.length != b.length)
 		return false;
@@ -68,7 +63,7 @@ bool StringRef::equals(const StringRef& a, const StringRef& b)
 	return true;
 }
 
-std::ostream& operator<<(std::ostream& os, const StringRef& str)
+std::ostream& operator<<(std::ostream& os, const IndirecString& str)
 {
 	for (size_t i = 0; i < str.length; ++i) { os << str.text[i]; }
 	return os;
@@ -77,19 +72,18 @@ std::ostream& operator<<(std::ostream& os, const StringRef& str)
 void AST::Print()
 {
 	std::cout << "Shader: " << name << std::endl;
-	// std::cout << "Test" << std::endl;
 	for (const auto& codeFragment : codeFragments)
 	{
 		std::cout << "CodeFragment: " << codeFragment.name << std::endl;
 		std::cout << "Code: " << codeFragment.code << std::endl;
-		std::cout << "Ifdef Depth: " << codeFragment.ifdef_depth << std::endl;
-		std::cout << "Current Stage: " << static_cast<uint32_t>(codeFragment.current_stage) << std::endl;
+		std::cout << "Ifdef Depth: " << codeFragment.ifdefDepth << std::endl;
+		std::cout << "Current Stage: " << static_cast<uint32_t>(codeFragment.currentStage) << std::endl;
 		for (const auto& resource : codeFragment.resources) { std::cout << "Resource: " << resource.name << std::endl; }
 		for (const auto& include : codeFragment.includes) { std::cout << "Include: " << include << std::endl; }
-		for (const auto& include_flag : codeFragment.includes_flags) { std::cout << "Include Flag: " << include_flag << std::endl; }
+		for (const auto& include_flag : codeFragment.includesFlags) { std::cout << "Include Flag: " << include_flag << std::endl; }
 		for (size_t i = 0; i < static_cast<uint32_t>(ShaderStage::Count); i++)
 		{
-			std::cout << "Stage Ifdef Depth: " << codeFragment.stage_ifdef_depth[i] << std::endl;
+			std::cout << "Stage Ifdef Depth: " << codeFragment.stageIfdefDepth[i] << std::endl;
 		}
 	}
 	for (const auto& pass : passes)
@@ -105,105 +99,81 @@ void AST::Print()
 
 Lexer::Lexer(const std::string& source): position(source.c_str()), line(1), column(0), hasError(false), errorLine(1) {}
 
-void Lexer::nextToken(Token& token)
+std::map<char, TokenType> tokenMap = {
+	{'\0', TokenType::Token_EndOfStream},
+	{'(', TokenType::Token_OpenParen},
+	{')', TokenType::Token_CloseParen},
+	{':', TokenType::Token_Colon},
+	{';', TokenType::Token_Semicolon},
+	{'*', TokenType::Token_Asterisk},
+	{'[', TokenType::Token_OpenBracket},
+	{']', TokenType::Token_CloseBracket},
+	{'{', TokenType::Token_OpenBrace},
+	{'}', TokenType::Token_CloseBrace},
+	{'=', TokenType::Token_Equals},
+	{'#', TokenType::Token_Hash},
+	{',', TokenType::Token_Comma},
+};
+
+void Lexer::GetTokenTextFromString(IndirecString& tokenText)
+{
+	tokenText.text = position;
+	while (position[0] &&
+	       position[0] != '"')
+	{
+		if ((position[0] == '\\') &&
+		    position[1]) { ++position; }
+		++position;
+	}
+	tokenText.length = static_cast<uint32_t>(position - tokenText.text);
+	if (position[0] == '"') { ++position; }
+}
+
+bool Lexer::IsIdOrKeyword(char c) { return IsAlpha(c); }
+
+void Lexer::NextToken(Token& token)
 {
 	SkipWhitespaceAndComments();
-
-	// Initialize token
-	token.type = TokenType::Token_Unknown;
-	token.text.text = position;
-	token.text.length = 1;
-	token.line = line;
-
+	token.Init(position, line);
 	char c = position[0];
 	++position;
-
-	switch (c)
+	if (tokenMap.find(c) != tokenMap.end())
 	{
-		case '\0': { token.type = TokenType::Token_EndOfStream; }
-		break;
-		case '(': { token.type = TokenType::Token_OpenParen; }
-		break;
-		case ')': { token.type = TokenType::Token_CloseParen; }
-		break;
-		case ':': { token.type = TokenType::Token_Colon; }
-		break;
-		case ';': { token.type = TokenType::Token_Semicolon; }
-		break;
-		case '*': { token.type = TokenType::Token_Asterisk; }
-		break;
-		case '[': { token.type = TokenType::Token_OpenBracket; }
-		break;
-		case ']': { token.type = TokenType::Token_CloseBracket; }
-		break;
-		case '{': { token.type = TokenType::Token_OpenBrace; }
-		break;
-		case '}': { token.type = TokenType::Token_CloseBrace; }
-		break;
-		case '=': { token.type = TokenType::Token_Equals; }
-		break;
-		case '#': { token.type = TokenType::Token_Hash; }
-		break;
-		case ',': { token.type = TokenType::Token_Comma; }
-		break;
-
-		case '"':
+		token.type = tokenMap[c];
+		if (token.type == TokenType::Token_String) { GetTokenTextFromString(token.text); }
+	}
+	else
+	{
+		if (IsIdOrKeyword(c))
 		{
-			token.type = TokenType::Token_String;
-
-			token.text.text = position;
-
-			while (position[0] &&
-			       position[0] != '"')
-			{
-				if ((position[0] == '\\') &&
-				    position[1]) { ++position; }
-				++position;
-			}
-
+			token.type = TokenType::Token_Identifier;
+			while (IsAlpha(position[0]) || IsNumber(position[0]) || (position[0] == '_')) { ++position; }
 			token.text.length = static_cast<uint32_t>(position - token.text.text);
-			if (position[0] == '"') { ++position; }
 		}
-		break;
-
-		default:
+		else if (IsNumber(c) || c == '-')
 		{
-			// Identifier/keywords
-			if (IsAlpha(c))
-			{
-				token.type = TokenType::Token_Identifier;
-
-				while (IsAlpha(position[0]) || IsNumber(position[0]) || (position[0] == '_')) { ++position; }
-
-				token.text.length = static_cast<uint32_t>(position - token.text.text);
-			} // Numbers: handle also negative ones!
-			else if (IsNumber(c) || c == '-')
-			{
-				// Backtrack to start properly parsing the number
-				--position;
-				parseNumber();
-				// Update token and calculate correct length.
-				token.type = TokenType::Token_Number;
-				token.text.length = static_cast<uint32_t>(position - token.text.text);
-			}
-			else { token.type = TokenType::Token_Unknown; }
+			token.type = TokenType::Token_Number;
+			// Backtrack to start properly parsing the number
+			--position;
+			ParseNumber();
+			token.text.length = static_cast<uint32_t>(position - token.text.text);
 		}
-		break;
+		else { token.type = TokenType::Token_Unknown; }
 	}
 }
 
-bool Lexer::equalToken(Token& token, TokenType expected_type)
+bool Lexer::EqualToken(Token& token, TokenType expected_type)
 {
-	nextToken(token);
+	NextToken(token);
 	return token.type == expected_type;
 }
 
-bool Lexer::expectToken(Token& token, TokenType expected_type)
+bool Lexer::ExpectToken(Token& token, TokenType expected_type)
 {
 	if (hasError)
 		return true;
 
-	nextToken(token);
+	NextToken(token);
 	hasError = token.type != expected_type;
 	if (hasError)
 	{
@@ -235,14 +205,11 @@ void Lexer::SkipCStyleComments()
 {
 	position += 2;
 
-	// Advance until the string is closed. Remember to check if line is changed.
 	while (!((position[0] == '*') && (position[1] == '/')))
 	{
-		// Handle change of line
 		if (IsEndOfLine(position[0]))
 			++line;
 
-		// Advance to next character
 		++position;
 	}
 
@@ -266,21 +233,19 @@ void Lexer::SkipWhitespaceAndComments()
 	}
 }
 
-void Lexer::parseNumber()
+int32_t Lexer::CheckSign(char c)
 {
-	char c = position[0];
-
-	// Parse the following literals:
-	// 58, -58, 0.003, 4e2, 123.456e-67, 0.1E4f
-	// 1. Sign detection
 	int32_t sign = 1;
 	if (c == '-')
 	{
 		sign = -1;
 		++position;
 	}
+	return sign;
+}
 
-	// 2. Heading zeros (00.003)
+void Lexer::HeadingZero()
+{
 	if (*position == '0')
 	{
 		++position;
@@ -288,7 +253,10 @@ void Lexer::parseNumber()
 		while (*position == '0')
 			++position;
 	}
-	// 3. Decimal part (until the point)
+}
+
+int32_t Lexer::HandleDecimalPart()
+{
 	int32_t decimal_part = 0;
 	if (*position > '0' && *position <= '9')
 	{
@@ -302,10 +270,11 @@ void Lexer::parseNumber()
 			++position;
 		}
 	}
-	// 4. Fractional part
-	int32_t fractional_part = 0;
-	int32_t fractional_divisor = 1;
+	return decimal_part;
+}
 
+void Lexer::HandleFractionalPart(int32_t& fractional_part, int32_t& fractional_divisor)
+{
 	if (*position == '.')
 	{
 		++position;
@@ -318,27 +287,37 @@ void Lexer::parseNumber()
 			++position;
 		}
 	}
-
-	// 5. Exponent (if present)
-	if (*position == 'e' || *position == 'E') { ++position; }
-
-	double parsed_number = (double)sign * (decimal_part + ((double)fractional_part / fractional_divisor));
-	// add_data(data_buffer, parsed_number); //TODO
 }
 
-void Parser::generateAST()
+void Lexer::HandleExponent() { if (*position == 'e' || *position == 'E') { ++position; } }
+// Parse the following literals:
+// 58, -58, 0.003, 4e2, 123.456e-67, 0.1E4f
+void Lexer::ParseNumber()
+{
+	int32_t sign = CheckSign(position[0]);
+	// 00.003
+	HeadingZero();
+	int32_t decimal_part = HandleDecimalPart();
+	int32_t fractional_part = 0;
+	int32_t fractional_divisor = 1;
+	HandleFractionalPart(fractional_part, fractional_divisor);
+	HandleExponent();
+	// double parsed_number = (double)sign * (decimal_part + ((double)fractional_part / fractional_divisor));
+	// add_data(data_buffer, parsed_number); 
+}
+
+void Parser::GenerateAST()
 {
 	bool parsing = true;
 	while (parsing)
 	{
 		Token token;
-		lexer.nextToken(token);
-
+		lexer.NextToken(token);
 		switch (token.type)
 		{
 			case TokenType::Token_Identifier:
 			{
-				identifier(token);
+				Identifier(token);
 				break;
 			}
 
@@ -347,23 +326,24 @@ void Parser::generateAST()
 				parsing = false;
 				break;
 			}
+			default: break;
 		}
 	}
 }
 
-void Parser::declarationShader()
+void Parser::DeclarationShader()
 {
 	Token token;
-	if (!lexer.expectToken(token, TokenType::Token_Identifier)) { return; }
+	if (!lexer.ExpectToken(token, TokenType::Token_Identifier)) { return; }
 
 	ast.name = token.text;
 
-	if (!lexer.expectToken(token, TokenType::Token_OpenBrace)) { return; }
+	if (!lexer.ExpectToken(token, TokenType::Token_OpenBrace)) { return; }
 
-	while (!lexer.equalToken(token, TokenType::Token_CloseBrace)) { identifier(token); }
+	while (!lexer.EqualToken(token, TokenType::Token_CloseBrace)) { Identifier(token); }
 }
 
-void Parser::directive_identifier(const Token& token, CodeFragment& code_fragment)
+void Parser::DirectiveIdentifier(const Token& token, CodeFragment& code_fragment)
 {
 	Token new_token;
 	for (uint32_t i = 0; i < token.text.length; ++i)
@@ -375,31 +355,31 @@ void Parser::directive_identifier(const Token& token, CodeFragment& code_fragmen
 			case 'i':
 			{
 				// Search for the pattern 'if defined'
-				if (expectKeyword(token.text, "if"))
+				if (ExpectKeyword(token.text, "if"))
 				{
-					lexer.nextToken(new_token);
+					lexer.NextToken(new_token);
 
-					if (expectKeyword(new_token.text, "defined"))
+					if (ExpectKeyword(new_token.text, "defined"))
 					{
-						lexer.nextToken(new_token);
+						lexer.NextToken(new_token);
 
 						// Use 0 as not set value for the ifdef depth.
-						++code_fragment.ifdef_depth;
+						++code_fragment.ifdefDepth;
 
-						if (expectKeyword(new_token.text, "VERTEX"))
+						if (ExpectKeyword(new_token.text, "VERTEX"))
 						{
-							code_fragment.stage_ifdef_depth[static_cast<uint32_t>(ShaderStage::Vertex)] = code_fragment.ifdef_depth;
-							code_fragment.current_stage = ShaderStage::Vertex;
+							code_fragment.stageIfdefDepth[static_cast<uint32_t>(ShaderStage::Vertex)] = code_fragment.ifdefDepth;
+							code_fragment.currentStage = ShaderStage::Vertex;
 						}
-						else if (expectKeyword(new_token.text, "FRAGMENT"))
+						else if (ExpectKeyword(new_token.text, "FRAGMENT"))
 						{
-							code_fragment.stage_ifdef_depth[static_cast<uint32_t>(ShaderStage::Fragment)] = code_fragment.ifdef_depth;
-							code_fragment.current_stage = ShaderStage::Fragment;
+							code_fragment.stageIfdefDepth[static_cast<uint32_t>(ShaderStage::Fragment)] = code_fragment.ifdefDepth;
+							code_fragment.currentStage = ShaderStage::Fragment;
 						}
-						else if (expectKeyword(new_token.text, "COMPUTE"))
+						else if (ExpectKeyword(new_token.text, "COMPUTE"))
 						{
-							code_fragment.stage_ifdef_depth[static_cast<uint32_t>(ShaderStage::Compute)] = code_fragment.ifdef_depth;
-							code_fragment.current_stage = ShaderStage::Compute;
+							code_fragment.stageIfdefDepth[static_cast<uint32_t>(ShaderStage::Compute)] = code_fragment.ifdefDepth;
+							code_fragment.currentStage = ShaderStage::Compute;
 						}
 					}
 
@@ -410,24 +390,24 @@ void Parser::directive_identifier(const Token& token, CodeFragment& code_fragmen
 
 			case 'p':
 			{
-				if (expectKeyword(token.text, "pragma"))
+				if (ExpectKeyword(token.text, "pragma"))
 				{
-					lexer.nextToken(new_token);
+					lexer.NextToken(new_token);
 
-					if (expectKeyword(new_token.text, "include"))
+					if (ExpectKeyword(new_token.text, "include"))
 					{
-						lexer.nextToken(new_token);
+						lexer.NextToken(new_token);
 
 						code_fragment.includes.emplace_back(new_token.text);
-						code_fragment.includes_flags.emplace_back((uint32_t)code_fragment.current_stage);
+						code_fragment.includesFlags.emplace_back((uint32_t)code_fragment.currentStage);
 					}
-					else if (expectKeyword(new_token.text, "include_hfx"))
+					else if (ExpectKeyword(new_token.text, "include_hfx"))
 					{
-						lexer.nextToken(new_token);
+						lexer.NextToken(new_token);
 
 						code_fragment.includes.emplace_back(new_token.text);
-						uint32_t flag = (uint32_t)code_fragment.current_stage | 0x10; // 0x10 = local hfx.
-						code_fragment.includes_flags.emplace_back(flag);
+						uint32_t flag = (uint32_t)code_fragment.currentStage | 0x10; // 0x10 = local hfx.
+						code_fragment.includesFlags.emplace_back(flag);
 					}
 
 					return;
@@ -437,25 +417,25 @@ void Parser::directive_identifier(const Token& token, CodeFragment& code_fragmen
 
 			case 'e':
 			{
-				if (expectKeyword(token.text, "endif"))
+				if (ExpectKeyword(token.text, "endif"))
 				{
-					if (code_fragment.stage_ifdef_depth[static_cast<uint32_t>(ShaderStage::Vertex)] == code_fragment.ifdef_depth)
+					if (code_fragment.stageIfdefDepth[static_cast<uint32_t>(ShaderStage::Vertex)] == code_fragment.ifdefDepth)
 					{
-						code_fragment.stage_ifdef_depth[static_cast<uint32_t>(ShaderStage::Vertex)] = 0xffffffff;
-						code_fragment.current_stage = ShaderStage::Count;
+						code_fragment.stageIfdefDepth[static_cast<uint32_t>(ShaderStage::Vertex)] = 0xffffffff;
+						code_fragment.currentStage = ShaderStage::Count;
 					}
-					else if (code_fragment.stage_ifdef_depth[static_cast<uint32_t>(ShaderStage::Fragment)] == code_fragment.ifdef_depth)
+					else if (code_fragment.stageIfdefDepth[static_cast<uint32_t>(ShaderStage::Fragment)] == code_fragment.ifdefDepth)
 					{
-						code_fragment.stage_ifdef_depth[static_cast<uint32_t>(ShaderStage::Fragment)] = 0xffffffff;
-						code_fragment.current_stage = ShaderStage::Count;
+						code_fragment.stageIfdefDepth[static_cast<uint32_t>(ShaderStage::Fragment)] = 0xffffffff;
+						code_fragment.currentStage = ShaderStage::Count;
 					}
-					else if (code_fragment.stage_ifdef_depth[static_cast<uint32_t>(ShaderStage::Compute)] == code_fragment.ifdef_depth)
+					else if (code_fragment.stageIfdefDepth[static_cast<uint32_t>(ShaderStage::Compute)] == code_fragment.ifdefDepth)
 					{
-						code_fragment.stage_ifdef_depth[static_cast<uint32_t>(ShaderStage::Compute)] = 0xffffffff;
-						code_fragment.current_stage = ShaderStage::Count;
+						code_fragment.stageIfdefDepth[static_cast<uint32_t>(ShaderStage::Compute)] = 0xffffffff;
+						code_fragment.currentStage = ShaderStage::Count;
 					}
 
-					--code_fragment.ifdef_depth;
+					--code_fragment.ifdefDepth;
 
 					return;
 				}
@@ -465,7 +445,7 @@ void Parser::directive_identifier(const Token& token, CodeFragment& code_fragmen
 	}
 }
 
-void Parser::uniform_identifier(const Token& token, CodeFragment& code_fragment)
+void Parser::UniformIdentifier(const Token& token, CodeFragment& code_fragment)
 {
 	for (uint32_t i = 0; i < token.text.length; ++i)
 	{
@@ -475,11 +455,11 @@ void Parser::uniform_identifier(const Token& token, CodeFragment& code_fragment)
 		{
 			case 'i':
 			{
-				if (expectKeyword(token.text, "image2D"))
+				if (ExpectKeyword(token.text, "image2D"))
 				{
 					// Advance to next token to get the name
 					Token name_token;
-					lexer.nextToken(name_token);
+					lexer.NextToken(name_token);
 
 					CodeFragment::Resource resource = {ResourceType::TextureRW, name_token.text};
 					code_fragment.resources.emplace_back(resource);
@@ -489,11 +469,11 @@ void Parser::uniform_identifier(const Token& token, CodeFragment& code_fragment)
 
 			case 's':
 			{
-				if (expectKeyword(token.text, "sampler2D"))
+				if (ExpectKeyword(token.text, "sampler2D"))
 				{
 					// Advance to next token to get the name
 					Token name_token;
-					lexer.nextToken(name_token);
+					lexer.NextToken(name_token);
 
 					CodeFragment::Resource resource = {ResourceType::Texture, name_token.text};
 					code_fragment.resources.emplace_back(resource);
@@ -504,21 +484,21 @@ void Parser::uniform_identifier(const Token& token, CodeFragment& code_fragment)
 	}
 }
 
-void Parser::declarationGlsl()
+void Parser::DeclarationGlsl()
 {
 	// Parse name
 	Token token;
-	if (!lexer.expectToken(token, TokenType::Token_Identifier)) { return; }
+	if (!lexer.ExpectToken(token, TokenType::Token_Identifier)) { return; }
 	CodeFragment code_fragment = {};
 	// Cache name string
 	code_fragment.name = token.text;
 
-	for (size_t i = 0; i < static_cast<uint32_t>(ShaderStage::Count); i++) { code_fragment.stage_ifdef_depth[i] = 0xffffffff; }
+	for (size_t i = 0; i < static_cast<uint32_t>(ShaderStage::Count); i++) { code_fragment.stageIfdefDepth[i] = 0xffffffff; }
 
-	if (!lexer.expectToken(token, TokenType::Token_OpenBrace)) { return; }
+	if (!lexer.ExpectToken(token, TokenType::Token_OpenBrace)) { return; }
 
 	// Advance token and cache the starting point of the code.
-	lexer.nextToken(token);
+	lexer.NextToken(token);
 	code_fragment.code = token.text;
 
 	uint32_t open_braces = 1;
@@ -535,24 +515,24 @@ void Parser::declarationGlsl()
 		if (token.type == TokenType::Token_Hash)
 		{
 			// Get next token and check which directive is
-			lexer.nextToken(token);
+			lexer.NextToken(token);
 
-			directive_identifier(token, code_fragment);
+			DirectiveIdentifier(token, code_fragment);
 		}
 		else if (token.type == TokenType::Token_Identifier)
 		{
 			// Parse uniforms to add resource dependencies if not explicit in the HFX file.
-			if (expectKeyword(token.text, "uniform"))
+			if (ExpectKeyword(token.text, "uniform"))
 			{
-				lexer.nextToken(token);
+				lexer.NextToken(token);
 
-				uniform_identifier(token, code_fragment);
+				UniformIdentifier(token, code_fragment);
 			}
 		}
 
 		// Only advance token when we are inside the glsl braces, otherwise will skip the following glsl part.
 		if (open_braces)
-			lexer.nextToken(token);
+			lexer.NextToken(token);
 	}
 
 	// Calculate code string length using the token before the last close brace.
@@ -561,7 +541,7 @@ void Parser::declarationGlsl()
 	ast.codeFragments.emplace_back(code_fragment);
 }
 
-void Parser::directiveIdentifier(Parser* parser, const Token& token, CodeFragment& code_fragment)
+void Parser::DirectiveIdentifier(Parser* parser, const Token& token, CodeFragment& code_fragment)
 {
 	Token new_token;
 	for (uint32_t i = 0; i < token.text.length; ++i)
@@ -573,31 +553,31 @@ void Parser::directiveIdentifier(Parser* parser, const Token& token, CodeFragmen
 			case 'i':
 			{
 				// Search for the pattern 'if defined'
-				if (expectKeyword(token.text, "if"))
+				if (ExpectKeyword(token.text, "if"))
 				{
-					parser->lexer.nextToken(new_token);
+					parser->lexer.NextToken(new_token);
 
-					if (expectKeyword(new_token.text, "defined"))
+					if (ExpectKeyword(new_token.text, "defined"))
 					{
-						parser->lexer.nextToken(new_token);
+						parser->lexer.NextToken(new_token);
 
 						// Use 0 as not set value for the ifdef depth.
-						++code_fragment.ifdef_depth;
+						++code_fragment.ifdefDepth;
 
-						if (expectKeyword(new_token.text, "VERTEX"))
+						if (ExpectKeyword(new_token.text, "VERTEX"))
 						{
-							code_fragment.stage_ifdef_depth[static_cast<uint32_t>(ShaderStage::Vertex)] = code_fragment.ifdef_depth;
-							code_fragment.current_stage = ShaderStage::Vertex;
+							code_fragment.stageIfdefDepth[static_cast<uint32_t>(ShaderStage::Vertex)] = code_fragment.ifdefDepth;
+							code_fragment.currentStage = ShaderStage::Vertex;
 						}
-						else if (expectKeyword(new_token.text, "FRAGMENT"))
+						else if (ExpectKeyword(new_token.text, "FRAGMENT"))
 						{
-							code_fragment.stage_ifdef_depth[static_cast<uint32_t>(ShaderStage::Fragment)] = code_fragment.ifdef_depth;
-							code_fragment.current_stage = ShaderStage::Fragment;
+							code_fragment.stageIfdefDepth[static_cast<uint32_t>(ShaderStage::Fragment)] = code_fragment.ifdefDepth;
+							code_fragment.currentStage = ShaderStage::Fragment;
 						}
-						else if (expectKeyword(new_token.text, "COMPUTE"))
+						else if (ExpectKeyword(new_token.text, "COMPUTE"))
 						{
-							code_fragment.stage_ifdef_depth[static_cast<uint32_t>(ShaderStage::Compute)] = code_fragment.ifdef_depth;
-							code_fragment.current_stage = ShaderStage::Compute;
+							code_fragment.stageIfdefDepth[static_cast<uint32_t>(ShaderStage::Compute)] = code_fragment.ifdefDepth;
+							code_fragment.currentStage = ShaderStage::Compute;
 						}
 					}
 
@@ -607,16 +587,16 @@ void Parser::directiveIdentifier(Parser* parser, const Token& token, CodeFragmen
 			}
 			case 'p':
 			{
-				if (expectKeyword(token.text, "pragma"))
+				if (ExpectKeyword(token.text, "pragma"))
 				{
-					parser->lexer.nextToken(new_token);
+					parser->lexer.NextToken(new_token);
 
-					if (expectKeyword(new_token.text, "include"))
+					if (ExpectKeyword(new_token.text, "include"))
 					{
-						parser->lexer.nextToken(new_token);
+						parser->lexer.NextToken(new_token);
 
 						code_fragment.includes.emplace_back(new_token.text);
-						code_fragment.includes_flags.emplace_back(static_cast<uint32_t>(code_fragment.current_stage));
+						code_fragment.includesFlags.emplace_back(static_cast<uint32_t>(code_fragment.currentStage));
 					}
 
 					return;
@@ -625,25 +605,25 @@ void Parser::directiveIdentifier(Parser* parser, const Token& token, CodeFragmen
 			}
 			case 'e':
 			{
-				if (expectKeyword(token.text, "endif"))
+				if (ExpectKeyword(token.text, "endif"))
 				{
-					if (code_fragment.stage_ifdef_depth[static_cast<uint32_t>(ShaderStage::Vertex)] == code_fragment.ifdef_depth)
+					if (code_fragment.stageIfdefDepth[static_cast<uint32_t>(ShaderStage::Vertex)] == code_fragment.ifdefDepth)
 					{
-						code_fragment.stage_ifdef_depth[static_cast<uint32_t>(ShaderStage::Vertex)] = 0xffffffff;
-						code_fragment.current_stage = ShaderStage::Count;
+						code_fragment.stageIfdefDepth[static_cast<uint32_t>(ShaderStage::Vertex)] = 0xffffffff;
+						code_fragment.currentStage = ShaderStage::Count;
 					}
-					else if (code_fragment.stage_ifdef_depth[static_cast<uint32_t>(ShaderStage::Fragment)] == code_fragment.ifdef_depth)
+					else if (code_fragment.stageIfdefDepth[static_cast<uint32_t>(ShaderStage::Fragment)] == code_fragment.ifdefDepth)
 					{
-						code_fragment.stage_ifdef_depth[static_cast<uint32_t>(ShaderStage::Fragment)] = 0xffffffff;
-						code_fragment.current_stage = ShaderStage::Count;
+						code_fragment.stageIfdefDepth[static_cast<uint32_t>(ShaderStage::Fragment)] = 0xffffffff;
+						code_fragment.currentStage = ShaderStage::Count;
 					}
-					else if (code_fragment.stage_ifdef_depth[static_cast<uint32_t>(ShaderStage::Compute)] == code_fragment.ifdef_depth)
+					else if (code_fragment.stageIfdefDepth[static_cast<uint32_t>(ShaderStage::Compute)] == code_fragment.ifdefDepth)
 					{
-						code_fragment.stage_ifdef_depth[static_cast<uint32_t>(ShaderStage::Compute)] = 0xffffffff;
-						code_fragment.current_stage = ShaderStage::Count;
+						code_fragment.stageIfdefDepth[static_cast<uint32_t>(ShaderStage::Compute)] = 0xffffffff;
+						code_fragment.currentStage = ShaderStage::Count;
 					}
 
-					--code_fragment.ifdef_depth;
+					--code_fragment.ifdefDepth;
 
 					return;
 				}
@@ -653,17 +633,17 @@ void Parser::directiveIdentifier(Parser* parser, const Token& token, CodeFragmen
 	}
 }
 
-void Parser::declarationShaderStage(Pass::Stage& out_stage)
+void Parser::DeclarationShaderStage(Pass::Stage& out_stage)
 {
 	Token token;
-	if (!lexer.expectToken(token, TokenType::Token_Equals)) { return; }
+	if (!lexer.ExpectToken(token, TokenType::Token_Equals)) { return; }
 
-	if (!lexer.expectToken(token, TokenType::Token_Identifier)) { return; }
+	if (!lexer.ExpectToken(token, TokenType::Token_Identifier)) { return; }
 
-	out_stage.code = findCodeFragment(token.text);
+	out_stage.code = FindCodeFragment(token.text);
 }
 
-void Parser::passIdentifier(const Token& token, Pass& pass)
+void Parser::PassIdentifier(const Token& token, Pass& pass)
 {
 	// Scan the name to know which stage we are parsing    
 	for (uint32_t i = 0; i < token.text.length; ++i)
@@ -674,10 +654,10 @@ void Parser::passIdentifier(const Token& token, Pass& pass)
 		{
 			case 'c':
 			{
-				if (expectKeyword(token.text, "compute"))
+				if (ExpectKeyword(token.text, "compute"))
 				{
 					Pass::Stage stage = {nullptr, ShaderStage::Compute};
-					declarationShaderStage(stage);
+					DeclarationShaderStage(stage);
 					pass.shader_stages.emplace_back(stage);
 					return;
 				}
@@ -686,10 +666,10 @@ void Parser::passIdentifier(const Token& token, Pass& pass)
 
 			case 'v':
 			{
-				if (expectKeyword(token.text, "vertex"))
+				if (ExpectKeyword(token.text, "vertex"))
 				{
 					Pass::Stage stage = {nullptr, ShaderStage::Vertex};
-					declarationShaderStage(stage);
+					DeclarationShaderStage(stage);
 					pass.shader_stages.emplace_back(stage);
 					return;
 				}
@@ -698,10 +678,10 @@ void Parser::passIdentifier(const Token& token, Pass& pass)
 
 			case 'f':
 			{
-				if (expectKeyword(token.text, "fragment"))
+				if (ExpectKeyword(token.text, "fragment"))
 				{
 					Pass::Stage stage = {nullptr, ShaderStage::Fragment};
-					declarationShaderStage(stage);
+					DeclarationShaderStage(stage);
 					pass.shader_stages.emplace_back(stage);
 					return;
 				}
@@ -711,32 +691,31 @@ void Parser::passIdentifier(const Token& token, Pass& pass)
 	}
 }
 
-void Parser::declarationPass()
+void Parser::DeclarationPass()
 {
 	Token token;
-	if (!lexer.expectToken(token, TokenType::Token_Identifier)) { return; }
+	if (!lexer.ExpectToken(token, TokenType::Token_Identifier)) { return; }
 
 	Pass pass = {};
 	// Cache name string
 	pass.name = token.text;
 
-	if (!lexer.expectToken(token, TokenType::Token_OpenBrace)) { return; }
-	while (!lexer.equalToken(token, TokenType::Token_CloseBrace)) { passIdentifier(token, pass); }
+	if (!lexer.ExpectToken(token, TokenType::Token_OpenBrace)) { return; }
+	while (!lexer.EqualToken(token, TokenType::Token_CloseBrace)) { PassIdentifier(token, pass); }
 	ast.passes.emplace_back(pass);
 }
 
-void Parser::identifier(const Token& token)
+void Parser::Identifier(const Token& token)
 {
-	// Scan the name to know which 
 	for (uint32_t i = 0; i < token.text.length; ++i)
 	{
 		switch (token.text.text[i])
 		{
 			case 's':
 			{
-				if (expectKeyword(token.text, "shader"))
+				if (ExpectKeyword(token.text, "shader"))
 				{
-					declarationShader();
+					DeclarationShader();
 					return;
 				}
 
@@ -745,9 +724,9 @@ void Parser::identifier(const Token& token)
 
 			case 'g':
 			{
-				if (expectKeyword(token.text, "glsl"))
+				if (ExpectKeyword(token.text, "glsl"))
 				{
-					declarationGlsl();
+					DeclarationGlsl();
 					return;
 				}
 				break;
@@ -755,9 +734,9 @@ void Parser::identifier(const Token& token)
 
 			case 'p':
 			{
-				if (expectKeyword(token.text, "pass"))
+				if (ExpectKeyword(token.text, "pass"))
 				{
-					declarationPass();
+					DeclarationPass();
 					return;
 				}
 				break;
@@ -766,12 +745,12 @@ void Parser::identifier(const Token& token)
 	}
 }
 
-const CodeFragment* Parser::findCodeFragment(const StringRef& name)
+const CodeFragment* Parser::FindCodeFragment(const IndirecString& name)
 {
 	for (uint32_t i = 0; i < ast.codeFragments.size(); ++i)
 	{
 		const CodeFragment* type = &ast.codeFragments[i];
-		if (StringRef::equals(name, type->name)) { return type; }
+		if (IndirecString::Equals(name, type->name)) { return type; }
 	}
 	return nullptr;
 }
@@ -780,20 +759,20 @@ void compileHFX(const std::string& filePath)
 {
 	Lexer lexer(FileReader(filePath).Read());
 	Parser parser(lexer);
-	parser.generateAST();
-	AST& ast = parser.getAST();
+	parser.GenerateAST();
+	AST& ast = parser.GetAST();
 	ast.Print();
 	ShaderGenerator shaderGenerator(ast);
-	shaderGenerator.generateShaders(ST::PathManager::GetHFXDir());
+	shaderGenerator.GenerateShaders(ST::PathManager::GetHFXDir());
 }
 
-ShaderGenerator::ShaderGenerator(const AST& ast): ast(ast), string_buffers(3) {}
+ShaderGenerator::ShaderGenerator(const AST& ast): ast(ast), stringBuffers(3) {}
 
-void ShaderGenerator::generateShaders(const std::string& path)
+void ShaderGenerator::GenerateShaders(const std::string& path)
 {
-	string_buffers[0].clear();
-	string_buffers[1].clear();
-	string_buffers[2].clear();
+	stringBuffers[0].clear();
+	stringBuffers[1].clear();
+	stringBuffers[2].clear();
 
 	// For each pass and for each pass generate permutation file.
 	const uint32_t pass_count = (uint32_t)ast.passes.size();
@@ -802,19 +781,19 @@ void ShaderGenerator::generateShaders(const std::string& path)
 		// Create one file for each code fragment
 		const Pass& pass = ast.passes[i];
 
-		for (size_t s = 0; s < pass.shader_stages.size(); ++s) { output_shader_stage(path, pass.shader_stages[s]); }
+		for (size_t s = 0; s < pass.shader_stages.size(); ++s) { OutputShaderStage(path, pass.shader_stages[s]); }
 	}
 }
 
-void ShaderGenerator::output_shader_stage(const std::string& path, const Pass::Stage& stage)
+void ShaderGenerator::OutputShaderStage(const std::string& path, const Pass::Stage& stage)
 {
 	const CodeFragment* code_fragment = stage.code;
 	if (code_fragment == nullptr)
 		return;
 
-	std::string fileName = path + code_fragment->name.to_string() + "_" + ShaderStage2Postfix(stage.stage) + ".glsl";
+	std::string fileName = path + code_fragment->name.ToString() + "_" + ShaderStage2Postfix(stage.stage) + ".glsl";
 	std::ofstream file(fileName);
-	std::string code = code_fragment->code.to_string();
+	std::string code = code_fragment->code.ToString();
 	file << "#version 330 core\n";
 	file << "#define " << ShaderStage2String(stage.stage) << "\n";
 	file << code;

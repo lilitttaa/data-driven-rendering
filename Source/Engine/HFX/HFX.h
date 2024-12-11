@@ -1,16 +1,14 @@
-#include <contrib/utf8cpp/source/utf8/core.h>
-
 namespace HFX
 {
-class StringRef
+class IndirecString
 {
 public:
 	size_t length;
 	char const* text;
 
-	static bool equals(const StringRef& a, const StringRef& b);
+	static bool Equals(const IndirecString& a, const IndirecString& b);
 
-	static void copy(const StringRef& a, char* buffer, size_t buffer_size)
+	static void Copy(const IndirecString& a, char* buffer, size_t buffer_size)
 	{
 		const size_t copy_size = a.length < buffer_size
 		                         ? a.length
@@ -18,17 +16,17 @@ public:
 		for (size_t i = 0; i < copy_size; ++i) { buffer[i] = a.text[i]; }
 	}
 
-	friend std::ostream& operator<<(std::ostream& os, const StringRef& str);
+	friend std::ostream& operator<<(std::ostream& os, const IndirecString& str);
 
-	std::string to_string() const
+	std::string ToString() const
 	{
 		std::string str;
 		for (size_t i = 0; i < length; ++i) { str += text[i]; }
 		return str;
 	}
-}; // struct StringRef
+};
 
-std::ostream& operator<<(std::ostream& os, const StringRef& str);
+std::ostream& operator<<(std::ostream& os, const IndirecString& str);
 
 struct CodeFragment;
 
@@ -58,12 +56,17 @@ enum class TokenType
 struct Token
 {
 	TokenType type;
-
-	StringRef text;
-	// const char* text;
-	// uint32_t length;
+	IndirecString text;
 	typedef TokenType Type;
 	uint32_t line;
+
+	void Init(char const* position, uint32_t inLine)
+	{
+		type = TokenType::Token_Unknown;
+		text.text = position;
+		text.length = 1;
+		line = inLine;
+	}
 };
 
 enum class ShaderStage
@@ -82,20 +85,20 @@ struct Pass
 	{
 		const CodeFragment* code = nullptr;
 		ShaderStage stage = ShaderStage::Count;
-	}; // struct ShaderStage
-	//
-	StringRef name;
+	};
+
+	IndirecString name;
 	// StringRef stage_name;
 	std::vector<Stage> shader_stages;
 	//
 	// std::vector<const ResourceList*> resource_lists; // List used by the pass
 	// const VertexLayout* vertex_layout;
 	// const RenderState* render_state;
-}; // struct Pass
+};
 
 struct AST
 {
-	StringRef name;
+	IndirecString name;
 	std::vector<CodeFragment> codeFragments;
 	std::vector<Pass> passes;
 
@@ -107,18 +110,18 @@ struct CodeFragment
 	struct Resource
 	{
 		ResourceType type;
-		StringRef name;
+		IndirecString name;
 	};
 
-	std::vector<StringRef> includes;
-	std::vector<uint32_t> includes_flags; // TODO: what is this?
+	std::vector<IndirecString> includes;
+	std::vector<uint32_t> includesFlags; // TODO: what is this?
 	std::vector<Resource> resources; // Resources used in the code.
 
-	StringRef name;
-	StringRef code;
-	ShaderStage current_stage = ShaderStage::Count;
-	uint32_t ifdef_depth = 0;
-	uint32_t stage_ifdef_depth[ShaderStage::Count];
+	IndirecString name;
+	IndirecString code;
+	ShaderStage currentStage = ShaderStage::Count;
+	uint32_t ifdefDepth = 0;
+	uint32_t stageIfdefDepth[ShaderStage::Count];
 };
 
 class Lexer
@@ -126,12 +129,16 @@ class Lexer
 public:
 	Lexer(const std::string& source);
 
-	void nextToken(Token& token);
+	void GetTokenTextFromString(IndirecString& token);
 
-	bool equalToken(Token& token, TokenType expected_type);
+	bool IsIdOrKeyword(char c);
+
+	void NextToken(Token& token);
+
+	bool EqualToken(Token& token, TokenType expected_type);
 
 	// The same to equalToken but with error handling.
-	bool expectToken(Token& token, TokenType expected_type);
+	bool ExpectToken(Token& token, TokenType expected_type);
 
 private:
 	bool IsEndOfLine(char c);
@@ -141,8 +148,6 @@ private:
 	bool IsAlpha(char c);
 
 	bool IsNumber(char c);
-
-	void parseNumber();
 
 private:
 	void SkipWhitespaceAndComments();
@@ -155,9 +160,22 @@ private:
 
 	void SkipCStyleComments();
 
+private:
+	void ParseNumber();
+
+	int32_t CheckSign(char c);
+
+	void HeadingZero();
+
+	int32_t HandleDecimalPart();
+
+	void HandleFractionalPart(int32_t& fractional_part, int32_t& fractional_divisor);
+
+	void HandleExponent();
+
 protected:
 	char const* position;
-	utf8::uint32_t line;
+	uint32_t line;
 	uint32_t column;
 	bool hasError;
 	uint32_t errorLine;
@@ -166,36 +184,36 @@ protected:
 class Parser
 {
 public:
-	explicit Parser(Lexer& lexer): ast(), lexer(lexer) {}
+	explicit Parser(Lexer& inLexer): ast(), lexer(inLexer) {}
 
 protected:
 	AST ast;
 	Lexer& lexer;
 
 public:
-	void generateAST();
+	void GenerateAST();
 
-	AST& getAST() { return ast; }
+	AST& GetAST() { return ast; }
 
-	inline void declarationShader();
+	inline void DeclarationShader();
 
-	void directive_identifier(const Token& token, CodeFragment& code_fragment);
+	void DirectiveIdentifier(const Token& token, CodeFragment& code_fragment);
 
-	void uniform_identifier(const Token& token, CodeFragment& code_fragment);
+	inline void DirectiveIdentifier(Parser* parser, const Token& token, CodeFragment& code_fragment);
 
-	inline void declarationGlsl();
+	void UniformIdentifier(const Token& token, CodeFragment& code_fragment);
 
-	inline void directiveIdentifier(Parser* parser, const Token& token, CodeFragment& code_fragment);
+	inline void DeclarationGlsl();
 
-	inline void declarationShaderStage(Pass::Stage& out_stage);
+	inline void DeclarationShaderStage(Pass::Stage& out_stage);
 
-	inline void passIdentifier(const Token& token, Pass& pass);
+	inline void PassIdentifier(const Token& token, Pass& pass);
 
-	inline void declarationPass();
+	inline void DeclarationPass();
 
-	inline void identifier(const Token& token);
+	inline void Identifier(const Token& token);
 
-	const CodeFragment* findCodeFragment(const StringRef& name);
+	const CodeFragment* FindCodeFragment(const IndirecString& name);
 };
 
 class ShaderGenerator
@@ -203,13 +221,13 @@ class ShaderGenerator
 public:
 	ShaderGenerator(const AST& ast);
 
-	void generateShaders(const std::string& path);
+	void GenerateShaders(const std::string& path);
 
-	void output_shader_stage(const std::string& path, const Pass::Stage& stage);
+	void OutputShaderStage(const std::string& path, const Pass::Stage& stage);
 
 protected:
 	const AST& ast;
-	std::vector<std::string> string_buffers;
+	std::vector<std::string> stringBuffers;
 };
 
 void compileHFX(const std::string& filePath);
