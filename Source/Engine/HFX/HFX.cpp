@@ -106,8 +106,7 @@ Lexer::Lexer(const std::string& source): position(source.c_str()), line(1), colu
 
 void Lexer::nextToken(Token& token)
 {
-	// Skip all whitespace first so that the token is without them.
-	skipWhitespace();
+	SkipWhitespaceAndComments();
 
 	// Initialize token
 	token.type = TokenType::Token_Unknown;
@@ -221,44 +220,47 @@ bool Lexer::IsAlpha(char c) { return ((c >= 'a' && c <= 'z') || (c >= 'A' && c <
 
 bool Lexer::IsNumber(char c) { return (c >= '0' && c <= '9'); }
 
-void Lexer::skipWhitespace()
+bool Lexer::IsSingleLineComments() { return (position[0] == '/') && (position[1] == '/'); }
+
+void Lexer::SkipComments()
 {
-	// Scan text until whitespace is finished.
-	for (;;)
+	position += 2;
+	while (position[0] && !IsEndOfLine(position[0])) { ++position; }
+}
+
+bool Lexer::IsCStyleComments() { return (position[0] == '/') && (position[1] == '*'); }
+
+void Lexer::SkipCStyleComments()
+{
+	position += 2;
+
+	// Advance until the string is closed. Remember to check if line is changed.
+	while (!((position[0] == '*') && (position[1] == '/')))
 	{
-		// Check if it is a pure whitespace first.
+		// Handle change of line
+		if (IsEndOfLine(position[0]))
+			++line;
+
+		// Advance to next character
+		++position;
+	}
+
+	if (position[0] == '*') { position += 2; }
+}
+
+void Lexer::SkipWhitespaceAndComments()
+{
+	while (true)
+	{
 		if (IsWhitespace(position[0]))
 		{
-			// Handle change of line
 			if (IsEndOfLine(position[0]))
 				++line;
 
-			// Advance to next character
 			++position;
-		} // Check for single line comments ("//")
-		else if ((position[0] == '/') && (position[1] == '/'))
-		{
-			position += 2;
-			while (position[0] && !IsEndOfLine(position[0])) { ++position; }
-		} // Check for c-style comments
-		else if ((position[0] == '/') && (position[1] == '*'))
-		{
-			position += 2;
-
-			// Advance until the string is closed. Remember to check if line is changed.
-			while (!((position[0] == '*') && (position[1] == '/')))
-			{
-				// Handle change of line
-				if (IsEndOfLine(position[0]))
-					++line;
-
-				// Advance to next character
-				++position;
-			}
-
-			if (position[0] == '*') { position += 2; }
 		}
-
+		else if (IsSingleLineComments()) { SkipComments(); }
+		else if (IsCStyleComments()) { SkipCStyleComments(); }
 		else { break; }
 	}
 }
@@ -776,14 +778,15 @@ const CodeFragment* Parser::findCodeFragment(const StringRef& name)
 	return nullptr;
 }
 
-void compileHFX(const std::string& filePath) {
+void compileHFX(const std::string& filePath)
+{
 	// Load HFX file
 	FileReader fileReader(filePath);
 	std::string hfxSourceStr = fileReader.Read();
 
 	Lexer lexer(hfxSourceStr);
-	// HFX::Parser parser(lexer);
-	// HFX::AST ast = parser.generateAST();
+	Parser parser(lexer);
+	parser.generateAST();
 	// ast.Print();
 	// HFX::ShaderGenerator shaderGenerator(ast);
 	// shaderGenerator.Generate();
@@ -869,5 +872,3 @@ protected:
 	std::vector<std::string> string_buffers;
 };
 }
-
-

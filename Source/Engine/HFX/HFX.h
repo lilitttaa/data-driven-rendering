@@ -1,7 +1,5 @@
 #include <contrib/utf8cpp/source/utf8/core.h>
 
-
-
 namespace HFX
 {
 class StringRef
@@ -144,9 +142,18 @@ private:
 
 	bool IsNumber(char c);
 
-	void skipWhitespace();
-
 	void parseNumber();
+
+private:
+	void SkipWhitespaceAndComments();
+
+	bool IsSingleLineComments();
+
+	void SkipComments();
+
+	bool IsCStyleComments();
+
+	void SkipCStyleComments();
 
 protected:
 	char const* position;
@@ -156,14 +163,18 @@ protected:
 	uint32_t errorLine;
 };
 
+struct AST
+{};
+
 class Parser
 {
 public:
-	Parser(Lexer& lexer): lexer(lexer) {}
+	explicit Parser(Lexer& lexer): shader(), lexer(lexer) {}
 
 	Shader shader;
 
 protected:
+	AST ast;
 	Lexer& lexer;
 
 public:
