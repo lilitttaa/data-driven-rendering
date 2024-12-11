@@ -27,6 +27,8 @@ std::string GetShaderDir() { return GetProjectDir() + "Resource/OpenGLShader/"; 
 
 std::string GetHFXDir() { return GetProjectDir() + "Resource/HFX/"; }
 
+std::string GetHFXGeneratedDir() { return GetProjectDir() + "Resource/HFX/Generated/"; }
+
 bool LoadFileToStr(std::string filePath, std::string& outStr)
 {
 	std::ifstream fileStream(filePath, std::ios::ate);
@@ -89,6 +91,13 @@ struct StringRef
 	}
 
 	friend std::ostream& operator<<(std::ostream& os, const StringRef& str);
+
+	std::string to_string() const
+    {
+        std::string str;
+        for (size_t i = 0; i < length; ++i) { str += text[i]; }
+        return str;
+    }
 }; // struct StringRef
 
 std::ostream& operator<<(std::ostream& os, const StringRef& str)
@@ -143,6 +152,19 @@ enum class ShaderStage
 {
 	Vertex = 0, Fragment, Geometry, Compute, Hull, Domain, Count
 };
+
+std::string shaderStageTable[] = {"VERTEX", "FRAGMENT", "GEOMETRY", "COMPUTE", "HULL", "DOMAIN"};
+std::string shaderStagePostfixTable[] = {"vt", "fg", "gm", "cp", "hl", "dm"};
+
+std::string ShaderStage2Postfix(ShaderStage stage)
+{
+    return shaderStagePostfixTable[static_cast<uint32_t>(stage)];
+}
+
+std::string ShaderStage2String(ShaderStage stage)
+{
+	return shaderStageTable[static_cast<uint32_t>(stage)];
+}
 
 std::ostream& operator<<(std::ostream& os, const ShaderStage& stage)
 {
@@ -981,6 +1003,14 @@ public:
         if (code_fragment == nullptr)
             return;
 
+		std::string fileName = path + code_fragment->name.to_string() + "_" + ShaderStage2Postfix(stage.stage) + ".glsl";
+		std::ofstream file(fileName);
+		std::string code = code_fragment->code.to_string();
+		file << "#version 330 core\n";
+		file << "#define " << ShaderStage2String(stage.stage) << "\n";
+		file << code;
+		file.close();
+
         // Generate the permutation file
         // const char* stage_name = get_shader_stage_name( stage.stage );
         // const char* stage_extension = get_shader_stage_extension( stage.stage );
@@ -1012,11 +1042,11 @@ void compileHFX()
 	parser.generateAST();
 	parser.shader.ShowShader();
 
-	delete[] text;
+
 
 	HFX::CodeGenerator code_generator(parser);
-	code_generator.generateShaderPermutations("");
-
+	code_generator.generateShaderPermutations(GetHFXDir());
+	delete[] text;
 	// const char* vertexShaderSource = vertexShaderSourceStr.c_str();
 
 	// text = ReadEntireFileIntoMemory("SimpleFullscreen.hfx", nullptr);
