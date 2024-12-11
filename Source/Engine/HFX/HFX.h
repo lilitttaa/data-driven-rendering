@@ -1,24 +1,6 @@
 #include <contrib/utf8cpp/source/utf8/core.h>
 
-class FileReader
-{
-public:
-	explicit FileReader(const std::string& inFilePath) : filePath(inFilePath) {}
 
-	std::string Read()
-	{
-		std::ifstream fileStream(filePath);
-		if (!fileStream.is_open()) { throw std::runtime_error("Failed to open file: " + filePath); }
-
-		std::string content((std::istreambuf_iterator<char>(fileStream)),
-			std::istreambuf_iterator<char>());
-		fileStream.close();
-		return content;
-	}
-
-private:
-	std::string filePath;
-};
 
 namespace HFX
 {

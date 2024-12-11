@@ -5,6 +5,8 @@
 #include <vector>
 #include "HFX.h"
 
+#include "File/FileReader.h"
+
 // typedef std::string StringRef; //TODO
 // template <typename T>
 // typedef std::vector<T> VectorRef; //TODO
@@ -779,7 +781,7 @@ void compileHFX(const std::string& filePath) {
 	FileReader fileReader(filePath);
 	std::string hfxSourceStr = fileReader.Read();
 
-	HFX::Lexer lexer(hfxSourceStr);
+	Lexer lexer(hfxSourceStr);
 	// HFX::Parser parser(lexer);
 	// HFX::AST ast = parser.generateAST();
 	// ast.Print();
