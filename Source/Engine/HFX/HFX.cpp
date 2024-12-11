@@ -74,7 +74,7 @@ std::ostream& operator<<(std::ostream& os, const StringRef& str)
 	return os;
 }
 
-void Shader::ShowShader()
+void AST::Print()
 {
 	std::cout << "Shader: " << name << std::endl;
 	// std::cout << "Test" << std::endl;
@@ -356,7 +356,7 @@ void Parser::declarationShader()
 	Token token;
 	if (!lexer.expectToken(token, TokenType::Token_Identifier)) { return; }
 
-	shader.name = token.text;
+	ast.name = token.text;
 
 	if (!lexer.expectToken(token, TokenType::Token_OpenBrace)) { return; }
 
@@ -558,7 +558,7 @@ void Parser::declarationGlsl()
 	// Calculate code string length using the token before the last close brace.
 	code_fragment.code.length = token.text.text - code_fragment.code.text;
 
-	shader.codeFragments.emplace_back(code_fragment);
+	ast.codeFragments.emplace_back(code_fragment);
 }
 
 void Parser::directiveIdentifier(Parser* parser, const Token& token, CodeFragment& code_fragment)
@@ -722,7 +722,7 @@ void Parser::declarationPass()
 
 	if (!lexer.expectToken(token, TokenType::Token_OpenBrace)) { return; }
 	while (!lexer.equalToken(token, TokenType::Token_CloseBrace)) { passIdentifier(token, pass); }
-	shader.passes.emplace_back(pass);
+	ast.passes.emplace_back(pass);
 }
 
 void Parser::identifier(const Token& token)
@@ -768,9 +768,9 @@ void Parser::identifier(const Token& token)
 
 const CodeFragment* Parser::findCodeFragment(const StringRef& name)
 {
-	for (uint32_t i = 0; i < shader.codeFragments.size(); ++i)
+	for (uint32_t i = 0; i < ast.codeFragments.size(); ++i)
 	{
-		const CodeFragment* type = &shader.codeFragments[i];
+		const CodeFragment* type = &ast.codeFragments[i];
 		if (StringRef::equals(name, type->name)) { return type; }
 	}
 	return nullptr;
@@ -803,20 +803,15 @@ void compileHFX(const std::string& filePath)
 	// Generate Shaders
 
 	FileReader fileReader(filePath);
-	std::string hfxSourceStr = fileReader.Read();
-	// copy the string into a text char*
-	uint32_t allocated_size = hfxSourceStr.size() + 1;
-	char* text = new char[allocated_size]; //TODO: free this memory
-	memcpy(text, hfxSourceStr.c_str(), allocated_size);
+	const std::string hfxSourceStr = fileReader.Read();
 
-	HFX::Lexer lexer(hfxSourceStr);
-	HFX::Parser parser(lexer);
+	Lexer lexer(hfxSourceStr);
+	Parser parser(lexer);
 	parser.generateAST();
-	parser.shader.ShowShader();
-
-	HFX::CodeGenerator code_generator(parser);
+	AST& ast = parser.getAST();
+	ast.Print();
+	CodeGenerator code_generator(parser);
 	code_generator.generateShaderPermutations(ST::PathManager::GetHFXDir());
-	delete[] text;
 }
 
 CodeGenerator::CodeGenerator(Parser& parser): parser(parser), string_buffers(3) {}
@@ -828,11 +823,11 @@ void CodeGenerator::generateShaderPermutations(const std::string& path)
 	string_buffers[2].clear();
 
 	// For each pass and for each pass generate permutation file.
-	const uint32_t pass_count = (uint32_t)parser.shader.passes.size();
+	const uint32_t pass_count = (uint32_t)parser.getAST().passes.size();
 	for (uint32_t i = 0; i < pass_count; i++)
 	{
 		// Create one file for each code fragment
-		const Pass& pass = parser.shader.passes[i];
+		const Pass& pass = parser.getAST().passes[i];
 
 		for (size_t s = 0; s < pass.shader_stages.size(); ++s) { output_shader_stage(path, pass.shader_stages[s]); }
 	}

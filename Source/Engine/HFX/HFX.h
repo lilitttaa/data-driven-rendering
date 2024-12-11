@@ -93,13 +93,13 @@ struct Pass
 	// const RenderState* render_state;
 }; // struct Pass
 
-struct Shader
+struct AST
 {
 	StringRef name;
 	std::vector<CodeFragment> codeFragments;
 	std::vector<Pass> passes;
 
-	void ShowShader();
+	void Print();
 };
 
 struct CodeFragment
@@ -163,15 +163,13 @@ protected:
 	uint32_t errorLine;
 };
 
-struct AST
-{};
+// struct AST
+// {};
 
 class Parser
 {
 public:
-	explicit Parser(Lexer& lexer): shader(), lexer(lexer) {}
-
-	Shader shader;
+	explicit Parser(Lexer& lexer): ast(), lexer(lexer) {}
 
 protected:
 	AST ast;
@@ -179,6 +177,8 @@ protected:
 
 public:
 	void generateAST();
+
+	AST& getAST() { return ast; }
 
 	inline void declarationShader();
 
