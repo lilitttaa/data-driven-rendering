@@ -8,11 +8,11 @@ public:
 
 	static bool Equals(const IndirecString& a, const IndirecString& b);
 
-	static void Copy(const IndirecString& a, char* buffer, size_t buffer_size)
+	static void Copy(const IndirecString& a, char* buffer, size_t bufferSize)
 	{
-		const size_t copy_size = a.length < buffer_size
+		const size_t copy_size = a.length < bufferSize
 		                         ? a.length
-		                         : buffer_size;
+		                         : bufferSize;
 		for (size_t i = 0; i < copy_size; ++i) { buffer[i] = a.text[i]; }
 	}
 
@@ -89,7 +89,7 @@ struct Pass
 
 	IndirecString name;
 	// StringRef stage_name;
-	std::vector<Stage> shader_stages;
+	std::vector<Stage> shaderStages;
 	//
 	// std::vector<const ResourceList*> resource_lists; // List used by the pass
 	// const VertexLayout* vertex_layout;
@@ -169,7 +169,7 @@ private:
 
 	int32_t HandleDecimalPart();
 
-	void HandleFractionalPart(int32_t& fractional_part, int32_t& fractional_divisor);
+	void HandleFractionalPart(int32_t& fractionalPart, int32_t& fractionalDivisor);
 
 	void HandleExponent();
 
@@ -197,11 +197,17 @@ public:
 
 	inline void DeclarationShader();
 
-	void DirectiveIdentifier(const Token& token, CodeFragment& code_fragment);
+	bool TryParseIfDefined(const Token& token, CodeFragment& codeFragment);
 
-	inline void DirectiveIdentifier(Parser* parser, const Token& token, CodeFragment& code_fragment);
+	bool TryParsePragma(const Token& token, CodeFragment& codeFragment);
 
-	void UniformIdentifier(const Token& token, CodeFragment& code_fragment);
+	bool TryParseEndIf(const Token& token, CodeFragment& codeFragment);
+
+	void DirectiveIdentifier(const Token& token, CodeFragment& codeFragment);
+	
+	void UniformIdentifier(const Token& token, CodeFragment& codeFragment);
+
+	void ParseGlslContent(Token& token, CodeFragment codeFragment);
 
 	inline void DeclarationGlsl();
 
@@ -227,8 +233,8 @@ public:
 
 protected:
 	const AST& ast;
-	std::vector<std::string> stringBuffers;
 };
 
 void compileHFX(const std::string& filePath);
+void CompileShaderEffectFile();
 }
