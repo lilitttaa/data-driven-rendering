@@ -3,6 +3,7 @@ namespace HFX
 class IndirecString
 {
 public:
+	IndirecString(): length(0), text(nullptr) {}
 	size_t length;
 	char const* text;
 
@@ -96,11 +97,25 @@ struct Pass
 	// const RenderState* render_state;
 };
 
+enum PropertyType {
+	Float, Int, Range, Color, Vector, Texture1D, Texture2D, Texture3D, TextureVolume, Unknown
+};
+
+struct Property
+{
+	IndirecString name;
+	IndirecString uiName;
+	IndirecString defaultValue;
+	PropertyType type;
+};
+
+
 struct AST
 {
 	IndirecString name;
 	std::vector<CodeFragment> codeFragments;
 	std::vector<Pass> passes;
+	std::vector<Property*> properties;
 
 	void Print();
 };
@@ -129,6 +144,8 @@ class Lexer
 public:
 	Lexer(const std::string& source);
 
+	Lexer(const Lexer& other);
+	
 	void GetTokenTextFromString(IndirecString& token);
 
 	bool IsIdOrKeyword(char c);
@@ -139,6 +156,9 @@ public:
 
 	// The same to equalToken but with error handling.
 	bool ExpectToken(Token& token, TokenType expected_type);
+
+	// Only check the token type.
+	bool CheckToken(const Token& token, TokenType expected_type);
 
 private:
 	bool IsEndOfLine(char c);
@@ -204,18 +224,30 @@ public:
 	bool TryParseEndIf(const Token& token, CodeFragment& codeFragment);
 
 	void DirectiveIdentifier(const Token& token, CodeFragment& codeFragment);
-	
+
 	void UniformIdentifier(const Token& token, CodeFragment& codeFragment);
 
 	void ParseGlslContent(Token& token, CodeFragment codeFragment);
 
-	inline void DeclarationGlsl();
+	inline void DeclarationGlsl();//TODO:remove inline
 
 	inline void DeclarationShaderStage(Pass::Stage& out_stage);
 
 	inline void PassIdentifier(const Token& token, Pass& pass);
 
 	inline void DeclarationPass();
+	
+	inline void DeclarationProperties();
+
+	bool NumberAndIdentifier(Token& token);
+
+	void ParsePropertyDefaultValue(Property* property, Token token);
+
+	void DeclarationProperty(const IndirecString& name );
+
+	PropertyType PropertyTypeIdentifier( const Token& token );
+	
+	Lexer CacheLexer(const Lexer& lexer);
 
 	inline void Identifier(const Token& token);
 
@@ -235,6 +267,7 @@ protected:
 	const AST& ast;
 };
 
-void compileHFX(const std::string& filePath);
+void CompileHFX(const std::string& filePath);
+
 void CompileShaderEffectFile();
 }

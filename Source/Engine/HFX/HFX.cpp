@@ -95,9 +95,19 @@ void AST::Print()
 			std::cout << "shader_stage.code->code: " << shaderStage.code->code << std::endl;
 		}
 	}
+	for(const auto& property : properties)
+	{
+		std::cout << "Property: " << property->name << std::endl;
+		std::cout << "UI Name: " << property->uiName << std::endl;
+		std::cout << "Default Value: " << property->defaultValue << std::endl;
+		std::cout << "Type: " << property->type << std::endl;
+	}
 }
 
 Lexer::Lexer(const std::string& source): position(source.c_str()), line(1), column(0), hasError(false), errorLine(1) {}
+
+Lexer::Lexer(const Lexer& other): position(other.position), line(other.line), column(other.column), hasError(other.hasError),
+	errorLine(other.errorLine) {}
 
 void Lexer::GetTokenTextFromString(IndirecString& tokenText)
 {
@@ -129,6 +139,7 @@ std::map<char, TokenType> tokenMap = {
 	{'=', TokenType::Token_Equals},
 	{'#', TokenType::Token_Hash},
 	{',', TokenType::Token_Comma},
+	{'"', TokenType::Token_String},
 };
 
 void Lexer::NextToken(Token& token)
@@ -175,6 +186,21 @@ bool Lexer::ExpectToken(Token& token, TokenType expected_type)
 
 	NextToken(token);
 	hasError = token.type != expected_type;
+	if (hasError)
+	{
+		// Save line of error
+		errorLine = line;
+	}
+	return !hasError;
+}
+
+bool Lexer::CheckToken(const Token& token, TokenType expected_type)
+{
+	if (hasError)
+		return true;
+
+	hasError = token.type != expected_type;
+
 	if (hasError)
 	{
 		// Save line of error
@@ -632,6 +658,163 @@ void Parser::DeclarationPass()
 	ast.passes.emplace_back(pass);
 }
 
+void Parser::DeclarationProperties()
+{
+	Token token;
+
+	if (!lexer.ExpectToken(token, TokenType::Token_OpenBrace)) { return; }
+
+	uint32_t open_braces = 1;
+	lexer.NextToken(token);
+
+	while (open_braces)
+	{
+		if (token.type == TokenType::Token_OpenBrace)
+			++open_braces;
+		else if (token.type == TokenType::Token_CloseBrace)
+			--open_braces;
+
+		if (token.type == TokenType::Token_Identifier) { DeclarationProperty(token.text); }
+
+		if (open_braces)
+			lexer.NextToken(token);
+	}
+}
+
+bool Parser::NumberAndIdentifier(Token& token)
+{
+	lexer.NextToken(token);
+	if (token.type == TokenType::Token_Number)
+	{
+		Token number_token = token;
+		lexer.NextToken(token);
+
+		// Extend current token to include the number.
+		token.text.text = number_token.text.text;
+		token.text.length += number_token.text.length;
+	}
+
+	if (token.type != TokenType::Token_Identifier) { return false; }
+	return true;
+}
+
+void Parser::ParsePropertyDefaultValue(Property* property, Token token)
+{
+	Lexer CachedLexer = CacheLexer(lexer);
+
+	lexer.NextToken(token);
+	// At this point only the optional default value is missing, otherwise the parsing is over.
+	if (token.type == TokenType::Token_Equals)
+	{
+		lexer.NextToken(token);
+
+		if (token.type == TokenType::Token_Number)
+		{
+			// Cache the data buffer entry index into the property for later retrieval.
+			// property->data_index = parser->lexer->data_buffer->current_entries - 1; TODO
+		}
+		else if (token.type == TokenType::Token_OpenParen)
+		{
+			// TODO: Colors and Vectors
+			// (number0, number1, ...)
+		}
+		else if (token.type == TokenType::Token_String)
+		{
+			// Texture.
+			property->defaultValue = token.text;
+		}
+		else
+		{
+			// Error!
+		}
+	}
+	else { lexer = CachedLexer; }
+}
+
+void Parser::DeclarationProperty(const IndirecString& name)
+{
+	Property* property = new Property();
+	property->name = name;
+
+	Token token;
+	if (!lexer.ExpectToken(token, TokenType::Token_OpenParen)) { return; }
+	if (!lexer.ExpectToken(token, TokenType::Token_String)) { return; }
+	property->uiName = token.text;
+	if (!lexer.ExpectToken(token, TokenType::Token_Comma)) { return; }
+
+	// Handle property type like '2D', 'Float'
+	if (!NumberAndIdentifier(token)) { return; }
+	property->type = PropertyTypeIdentifier(token);
+
+	lexer.NextToken(token);
+	if (!lexer.CheckToken(token, TokenType::Token_CloseParen)) { return; }
+	ParsePropertyDefaultValue(property, token);
+
+	ast.properties.push_back(property);
+}
+
+PropertyType Parser::PropertyTypeIdentifier(const Token& token)
+{
+	for (uint32_t i = 0; i < token.text.length; ++i)
+	{
+		char c = *(token.text.text + i);
+		switch (c)
+		{
+			case '1':
+			{
+				if (ExpectKeyword(token.text, "1D")) { return PropertyType::Texture1D; }
+				break;
+			}
+			case '2':
+			{
+				if (ExpectKeyword(token.text, "2D")) { return PropertyType::Texture2D; }
+				break;
+			}
+			case '3':
+			{
+				if (ExpectKeyword(token.text, "3D")) { return PropertyType::Texture3D; }
+				break;
+			}
+			case 'V':
+			{
+				if (ExpectKeyword(token.text, "Volume")) { return PropertyType::TextureVolume; }
+				else
+					if (ExpectKeyword(token.text, "Vector")) { return PropertyType::Vector; }
+				break;
+			}
+			case 'I':
+			{
+				if (ExpectKeyword(token.text, "Int")) { return PropertyType::Int; }
+				break;
+			}
+			case 'R':
+			{
+				if (ExpectKeyword(token.text, "Range")) { return PropertyType::Range; }
+				break;
+			}
+			case 'F':
+			{
+				if (ExpectKeyword(token.text, "Float")) { return PropertyType::Float; }
+				break;
+			}
+			case 'C':
+			{
+				if (ExpectKeyword(token.text, "Color")) { return PropertyType::Color; }
+				break;
+			}
+			default:
+			{
+				return PropertyType::Unknown;
+				break;
+			}
+		}
+	}
+
+	return PropertyType::Unknown;
+}
+
+Lexer Parser::CacheLexer(const Lexer& lexer) { return Lexer(lexer); }
+
 void Parser::Identifier(const Token& token)
 {
 	for (uint32_t i = 0; i < token.text.length; ++i)
@@ -664,6 +847,11 @@ void Parser::Identifier(const Token& token)
 				if (ExpectKeyword(token.text, "pass"))
 				{
 					DeclarationPass();
+					return;
+				}
+				else if (ExpectKeyword(token.text, "properties"))
+				{
+					DeclarationProperties();
 					return;
 				}
 				break;
@@ -709,9 +897,10 @@ void ShaderGenerator::OutputShaderStage(const std::string& path, const Pass::Sta
 	file.close();
 }
 
-void compileHFX(const std::string& filePath)
+void CompileHFX(const std::string& filePath)
 {
-	Lexer lexer(FileReader(filePath).Read());
+	std::string content = FileReader(filePath).Read();
+	Lexer lexer(content);
 	Parser parser(lexer);
 	parser.GenerateAST();
 	AST& ast = parser.GetAST();
