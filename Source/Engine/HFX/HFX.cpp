@@ -552,9 +552,9 @@ void Parser::DeclarationGlsl()
 	if (!lexer.ExpectToken(token, TokenType::Token_OpenBrace)) { return; }
 
 	lexer.NextToken(token);
-	ParseGlslContent(token, codeFragment);
-
 	codeFragment.code.text = token.text.text;
+	
+	ParseGlslContent(token, codeFragment);
 	codeFragment.code.length = token.text.text - codeFragment.code.text;
 
 	ast.codeFragments.emplace_back(codeFragment);
