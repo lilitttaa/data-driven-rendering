@@ -170,7 +170,10 @@ void DataBuffer::GetData(uint32_t entryIndex, float& value) const
 	value = static_cast<float>(*value_data);
 }
 
-uint32_t DataBuffer::GetLastEntryIndex() const { return currentEntryTrailIndex - 1; }
+uint32_t DataBuffer::GetLastEntryIndex() const
+{
+	return currentEntryTrailIndex - 1;
+}
 
 void AST::Print()
 {
