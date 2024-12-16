@@ -5,7 +5,7 @@ namespace HFX
 class IndirecString
 {
 public:
-	IndirecString(): length(0), text(nullptr) {}	
+	IndirecString(): length(0), text(nullptr) {}
 	size_t length;
 	char const* text;
 
@@ -351,5 +351,5 @@ protected:
 
 void CompileHFX(const std::string& filePath);
 
-void CompileShaderEffectFile(AST& ast, const DataBuffer& dataBuffer);
+void GeneatePropertiesShaderCodeAndGetDefault(AST& ast, const DataBuffer& dataBuffer, StringBuffer& outDefaults, StringBuffer& outBuffer); //TODO
 }

@@ -170,10 +170,7 @@ void DataBuffer::GetData(uint32_t entryIndex, float& value) const
 	value = static_cast<float>(*value_data);
 }
 
-uint32_t DataBuffer::GetLastEntryIndex() const
-{
-	return currentEntryTrailIndex - 1;
-}
+uint32_t DataBuffer::GetLastEntryIndex() const { return currentEntryTrailIndex - 1; }
 
 void AST::Print()
 {
@@ -841,10 +838,7 @@ void Parser::ParsePropertyDefaultValue(Property* property, Token token)
 			// For Texture.
 			property->defaultValue = token.text;
 		}
-		else
-		{
-			throw std::runtime_error("Invalid default value for property.");
-		}
+		else { throw std::runtime_error("Invalid default value for property."); }
 	}
 	else { lexer = CachedLexer; }
 }
@@ -1015,14 +1009,9 @@ void ShaderGenerator::OutputShaderStage(const std::string& path, const Pass::Sta
 	file.close();
 }
 
-void CompileShaderEffectFile(AST& ast, const DataBuffer& dataBuffer)
+void GeneatePropertiesShaderCodeAndGetDefault(AST& ast, const DataBuffer& dataBuffer, StringBuffer& outDefaults, StringBuffer& outBuffer)
 {
-	// Calculate Output File Path
-	std::string outputFilePath = ""; //TODO
-	StringBuffer outDefaults;
-	StringBuffer outBuffer;
-
-	// For each property, generate glsl code, get default value, (handle alignment)
+	// For each property, generate glsl code, output default value, (handle alignment)
 	if (!ast.properties.size())
 	{
 		uint32_t zeroSize = 0;
@@ -1107,6 +1096,11 @@ void CompileHFX(const std::string& filePath)
 	ShaderGenerator shaderGenerator(ast);
 	shaderGenerator.GenerateShaders(ST::PathManager::GetHFXDir());
 
-	CompileShaderEffectFile(ast, dataBuffer);
+	// Calculate Output File Path
+	std::string outputFilePath = ""; //TODO
+
+	StringBuffer outDefaults;
+	StringBuffer outBuffer;
+	GeneatePropertiesShaderCodeAndGetDefault(ast, dataBuffer, outDefaults, outBuffer);
 }
 }
