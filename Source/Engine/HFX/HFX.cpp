@@ -4,6 +4,9 @@
 #include <ostream>
 #include <vector>
 #include "HFX.h"
+
+#include <cstdarg>
+
 #include "PathManager.h"
 #include "File/FileReader.h"
 
@@ -69,6 +72,109 @@ std::ostream& operator<<(std::ostream& os, const IndirecString& str)
 	return os;
 }
 
+void StringBuffer::Reset(uint32_t size)
+{
+	data.reserve(size);
+	data.clear();
+}
+
+void StringBuffer::Clear() { data.clear(); }
+
+#define STRING_BUFFER_RESERVE_SIZE 1024
+
+void StringBuffer::AppendFormat(const char* format, ...)
+{
+	va_list args;
+	va_start(args, format);
+	std::vector<char> temp;
+	temp.resize(STRING_BUFFER_RESERVE_SIZE);
+	while (true)
+	{
+		va_list argsCopy;
+		argsCopy = args;
+		int writtenChars = vsnprintf(temp.data(), temp.size(), format, argsCopy);
+		if (writtenChars >= 0 && writtenChars < static_cast<int>(temp.size()))
+		{
+			data.insert(data.end(), temp.begin(), temp.begin() + writtenChars);
+			break;
+		}
+		else { temp.resize(temp.size() * 2); }
+	}
+	va_end(args);
+}
+
+void StringBuffer::AppendIndirectString(const IndirecString& text)
+{
+	if (text.length > 0) { data.insert(data.end(), text.text, text.text + text.length); }
+}
+
+void StringBuffer::AppendMemory(void* memory, uint32_t size)
+{
+	if (size > 0) { data.insert(data.end(), static_cast<char*>(memory), static_cast<char*>(memory) + size); }
+}
+
+void StringBuffer::AppendStringBuffer(const StringBuffer& other_buffer)
+{
+	data.insert(data.end(), other_buffer.data.begin(), other_buffer.data.end());
+}
+
+char* StringBuffer::Allocate(uint32_t size)
+{
+	if (data.capacity() - data.size() < size) { data.reserve(data.capacity() + size); }
+	size_t offset = data.size();
+	data.resize(data.size() + size);
+	return data.data() + offset;
+}
+
+size_t StringBuffer::Size() const { return data.size(); }
+const char* StringBuffer::CStr() const { return data.data(); }
+
+DataBuffer::DataBuffer(uint32_t maxEntries, uint32_t bufferSize): entries(maxEntries), data(bufferSize, '\0'),
+	maxEntries(maxEntries), currentEntryTrailIndex(0),
+	bufferSize(bufferSize), currentSize(0) {}
+
+void DataBuffer::Reset()
+{
+	currentSize = 0;
+	currentEntryTrailIndex = 0;
+}
+
+uint32_t DataBuffer::AddData(double inData)
+{
+	if (currentEntryTrailIndex >= maxEntries)
+		return -1;
+
+	if (currentSize + sizeof(double) >= bufferSize)
+		return -1;
+
+	// Init entry
+	Entry& entry = entries[currentEntryTrailIndex++];
+	entry.offset = currentSize;
+
+	// Copy data
+	std::memcpy(&data[currentSize], &inData, sizeof(double));
+	currentSize += sizeof(double);
+
+	return currentEntryTrailIndex - 1;
+}
+
+void DataBuffer::GetData(uint32_t entryIndex, float& value) const
+{
+	value = 0.0f;
+	if (entryIndex >= currentEntryTrailIndex)
+		return;
+
+	const Entry& entry = entries[entryIndex];
+	const double* value_data = reinterpret_cast<const double*>(&data[entry.offset]);
+
+	value = static_cast<float>(*value_data);
+}
+
+uint32_t DataBuffer::GetLastEntryIndex() const
+{
+	return currentEntryTrailIndex - 1;
+}
+
 void AST::Print()
 {
 	std::cout << "Shader: " << name << std::endl;
@@ -95,7 +201,7 @@ void AST::Print()
 			std::cout << "shader_stage.code->code: " << shaderStage.code->code << std::endl;
 		}
 	}
-	for(const auto& property : properties)
+	for (const auto& property : properties)
 	{
 		std::cout << "Property: " << property->name << std::endl;
 		std::cout << "UI Name: " << property->uiName << std::endl;
@@ -104,10 +210,22 @@ void AST::Print()
 	}
 }
 
-Lexer::Lexer(const std::string& source): position(source.c_str()), line(1), column(0), hasError(false), errorLine(1) {}
+Lexer::Lexer(const std::string& source, DataBuffer& inDataBuffer): position(source.c_str()), line(1), column(0), hasError(false), errorLine(1),
+	dataBuffer(inDataBuffer) {}
 
 Lexer::Lexer(const Lexer& other): position(other.position), line(other.line), column(other.column), hasError(other.hasError),
-	errorLine(other.errorLine) {}
+	errorLine(other.errorLine), dataBuffer(other.dataBuffer) {}
+
+Lexer& Lexer::operator=(const Lexer& other)
+{
+	position = other.position;
+	line = other.line;
+	column = other.column;
+	hasError = other.hasError;
+	errorLine = other.errorLine;
+	dataBuffer = other.dataBuffer;
+	return *this;
+}
 
 void Lexer::GetTokenTextFromString(IndirecString& tokenText)
 {
@@ -328,8 +446,8 @@ void Lexer::ParseNumber()
 	int32_t fractionalDivisor = 1;
 	HandleFractionalPart(fractionalPart, fractionalDivisor);
 	HandleExponent();
-	// double parsed_number = (double)sign * (decimal_part + ((double)fractional_part / fractional_divisor));
-	// add_data(data_buffer, parsed_number); 
+	double parsed_number = (double)sign * (decimalPart + ((double)fractionalPart / fractionalDivisor));
+	dataBuffer.AddData(parsed_number);
 }
 
 void Parser::GenerateAST()
@@ -579,7 +697,7 @@ void Parser::DeclarationGlsl()
 
 	lexer.NextToken(token);
 	codeFragment.code.text = token.text.text;
-	
+
 	ParseGlslContent(token, codeFragment);
 	codeFragment.code.length = token.text.text - codeFragment.code.text;
 
@@ -686,12 +804,12 @@ bool Parser::NumberAndIdentifier(Token& token)
 	lexer.NextToken(token);
 	if (token.type == TokenType::Token_Number)
 	{
-		Token number_token = token;
+		Token numberToken = token;
 		lexer.NextToken(token);
 
 		// Extend current token to include the number.
-		token.text.text = number_token.text.text;
-		token.text.length += number_token.text.length;
+		token.text.text = numberToken.text.text; //TODO
+		token.text.length += numberToken.text.length;
 	}
 
 	if (token.type != TokenType::Token_Identifier) { return false; }
@@ -711,7 +829,7 @@ void Parser::ParsePropertyDefaultValue(Property* property, Token token)
 		if (token.type == TokenType::Token_Number)
 		{
 			// Cache the data buffer entry index into the property for later retrieval.
-			// property->data_index = parser->lexer->data_buffer->current_entries - 1; TODO
+			property->dataIndex = dataBuffer.GetLastEntryIndex();
 		}
 		else if (token.type == TokenType::Token_OpenParen)
 		{
@@ -720,12 +838,12 @@ void Parser::ParsePropertyDefaultValue(Property* property, Token token)
 		}
 		else if (token.type == TokenType::Token_String)
 		{
-			// Texture.
+			// For Texture.
 			property->defaultValue = token.text;
 		}
 		else
 		{
-			// Error!
+			throw std::runtime_error("Invalid default value for property.");
 		}
 	}
 	else { lexer = CachedLexer; }
@@ -897,21 +1015,98 @@ void ShaderGenerator::OutputShaderStage(const std::string& path, const Pass::Sta
 	file.close();
 }
 
+void CompileShaderEffectFile(AST& ast, const DataBuffer& dataBuffer)
+{
+	// Calculate Output File Path
+	std::string outputFilePath = ""; //TODO
+	StringBuffer outDefaults;
+	StringBuffer outBuffer;
+
+	// For each property, generate glsl code, get default value, (handle alignment)
+	if (!ast.properties.size())
+	{
+		uint32_t zeroSize = 0;
+		outDefaults.AppendMemory(&zeroSize, sizeof(uint32_t));
+		return;
+	}
+
+	// Add the local constants into the code.
+	outBuffer.AppendFormat("\n\t\tlayout (std140, binding=7) uniform LocalConstants {\n\n");
+
+	// For GPU the struct must be 16 bytes aligned. Track alignment
+	uint32_t gpuStructAlignment = 0;
+
+	// In the defaults, write the type, size in '4 bytes' blocks, then data.
+	ResourceType resourceType = ResourceType::Constants;
+	outDefaults.AppendMemory(&resourceType, sizeof(ResourceType));
+
+	// Reserve space for later writing the correct value.
+	char* bufferSizeMemory = outDefaults.Allocate(sizeof(uint32_t));
+
+	for (size_t i = 0; i < ast.properties.size(); i++)
+	{
+		Property* property = ast.properties[i];
+
+		switch (property->type)
+		{
+			case PropertyType::Float:
+			{
+				outBuffer.AppendFormat("\t\t\tfloat\t\t\t\t\t");
+				outBuffer.AppendIndirectString(property->name);
+				outBuffer.AppendFormat(";\n");
+
+				// Get default value and write it into default buffer
+				if (property->dataIndex != INVALID_PROPERTY_DATA_INDEX)
+				{
+					float value = 0.0f;
+					dataBuffer.GetData(property->dataIndex, value);
+					outDefaults.AppendMemory(&value, sizeof(float));
+				}
+				// Update offset
+				property->offsetInBytes = gpuStructAlignment * 4;
+
+				++gpuStructAlignment;
+				break;
+			}
+
+			case PropertyType::Int: { break; }
+
+			case PropertyType::Range: { break; }
+
+			case PropertyType::Color: { break; }
+
+			case PropertyType::Vector: { break; }
+		}
+	}
+
+	uint32_t tailPaddingSize = 4 - (gpuStructAlignment % 4);
+	outBuffer.AppendFormat("\t\t\tfloat\t\t\t\t\tpad_tail[%u];\n\n", tailPaddingSize);
+	outBuffer.AppendFormat("\t\t} local_constants;\n\n");
+
+	for (uint32_t v = 0; v < tailPaddingSize; ++v)
+	{
+		float value = 0.0f;
+		outDefaults.AppendMemory(&value, sizeof(float));
+	}
+
+	// Write the constant buffer size in bytes.
+	uint32_t constantsBufferSize = (gpuStructAlignment + tailPaddingSize) * sizeof(float);
+	memcpy(bufferSizeMemory, &constantsBufferSize, sizeof(uint32_t));
+}
+
 void CompileHFX(const std::string& filePath)
 {
 	std::string content = FileReader(filePath).Read();
-	Lexer lexer(content);
-	Parser parser(lexer);
+	DataBuffer dataBuffer(256, 2048);
+	Lexer lexer(content, dataBuffer);
+	Parser parser(lexer, dataBuffer);
 	parser.GenerateAST();
 	AST& ast = parser.GetAST();
 	ast.Print();
+	dataBuffer.Print();
 	ShaderGenerator shaderGenerator(ast);
 	shaderGenerator.GenerateShaders(ST::PathManager::GetHFXDir());
-}
 
-void CompileShaderEffectFile()
-{
-	// Calculate Output File Path
-	// 
+	CompileShaderEffectFile(ast, dataBuffer);
 }
 }

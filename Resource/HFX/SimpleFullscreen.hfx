@@ -1,16 +1,23 @@
 shader SimpleFullscreen {
+
+	// For the artist
+    properties {
+        // Using Unity ShaderLab syntax:
+        // AORemapMin0("AORemapMin0", Range(0.0, 1.0)) = 0.0
+        scale("Scale", Float) = 16.0
+        albedo("Albedo", 2D) = "Test"
+        modulo("Modulo", Float) = 2.0
+    }
+
     glsl ToScreen {
-    
         #pragma include "Platform.h"
     
         #if defined VERTEX
         out vec4 vTexCoord;
     
         void main() {
-    
             vTexCoord.xy = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2);
             vTexCoord.zw = vTexCoord.xy;
-    
             gl_Position = vec4(vTexCoord.xy * 2.0f + -1.0f, 0.0f, 1.0f);
         }
         #endif // VERTEX

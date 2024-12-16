@@ -1,4 +1,14 @@
 shader BallShader {
+
+	// For the artist
+    properties {
+        // Using Unity ShaderLab syntax:
+        // AORemapMin0("AORemapMin0", Range(0.0, 1.0)) = 0.0
+        scale("Scale", Float) = 16.0
+        albedo("Albedo", 2D) = "Test"
+        modulo("Modulo", Float) = 2.0
+    }
+
     glsl Ball {
         #if defined VERTEX
         layout(location = 0) in vec3 aPos;

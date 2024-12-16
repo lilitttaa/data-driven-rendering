@@ -1,9 +1,11 @@
+#pragma once
+
 namespace HFX
 {
 class IndirecString
 {
 public:
-	IndirecString(): length(0), text(nullptr) {}
+	IndirecString(): length(0), text(nullptr) {}	
 	size_t length;
 	char const* text;
 
@@ -28,6 +30,78 @@ public:
 };
 
 std::ostream& operator<<(std::ostream& os, const IndirecString& str);
+
+class StringBuffer
+{
+public:
+	void Reset(uint32_t size);
+
+	void Clear();
+
+	void AppendFormat(const char* format, ...);
+
+	void AppendIndirectString(const IndirecString& text);
+
+	void AppendMemory(void* memory, uint32_t size);
+
+	void AppendStringBuffer(const StringBuffer& other_buffer);
+
+	char* Allocate(uint32_t size);
+
+	size_t Size() const;
+
+	const char* CStr() const;
+
+protected:
+	std::vector<char> data;
+};
+
+class DataBuffer
+{
+public:
+	// Constructor
+	DataBuffer(uint32_t maxEntries, uint32_t bufferSize);
+
+	// Destructor
+	~DataBuffer() = default;
+
+	void Reset();
+
+	uint32_t AddData(double inData);
+
+	void GetData(uint32_t entryIndex, float& value) const;
+
+	uint32_t GetLastEntryIndex() const;
+
+	void Print()
+	{
+		for (uint32_t i = 0; i < currentSize; ++i)
+		{
+			float value;
+			GetData(i, value);
+			std::cout << value << std::endl;
+		}
+	}
+
+protected:
+	struct Entry
+	{
+		uint32_t offset : 30;
+		uint32_t type : 2;
+
+		Entry() : offset(0), type(0) {}
+	};
+
+	std::vector<Entry> entries;
+	std::vector<char> data;
+	uint32_t maxEntries;
+	uint32_t currentEntryTrailIndex; //Index the element after the last element
+	uint32_t bufferSize;
+	uint32_t currentSize;
+};
+
+// No need for init_data_buffer and terminate_data_buffer functions
+// as the constructor and destructor handle initialization and cleanup.
 
 struct CodeFragment;
 
@@ -97,9 +171,12 @@ struct Pass
 	// const RenderState* render_state;
 };
 
-enum PropertyType {
+enum PropertyType
+{
 	Float, Int, Range, Color, Vector, Texture1D, Texture2D, Texture3D, TextureVolume, Unknown
 };
+
+#define INVALID_PROPERTY_DATA_INDEX 0xFFFFFFFF
 
 struct Property
 {
@@ -107,8 +184,9 @@ struct Property
 	IndirecString uiName;
 	IndirecString defaultValue;
 	PropertyType type;
+	uint32_t offsetInBytes = 0;
+	uint32_t dataIndex = INVALID_PROPERTY_DATA_INDEX;
 };
-
 
 struct AST
 {
@@ -142,10 +220,12 @@ struct CodeFragment
 class Lexer
 {
 public:
-	Lexer(const std::string& source);
+	Lexer(const std::string& source, DataBuffer& inDataBuffer);
 
 	Lexer(const Lexer& other);
-	
+
+	Lexer& operator=(const Lexer& other);
+
 	void GetTokenTextFromString(IndirecString& token);
 
 	bool IsIdOrKeyword(char c);
@@ -199,16 +279,18 @@ protected:
 	uint32_t column;
 	bool hasError;
 	uint32_t errorLine;
+	DataBuffer& dataBuffer;
 };
 
 class Parser
 {
 public:
-	explicit Parser(Lexer& inLexer): ast(), lexer(inLexer) {}
+	explicit Parser(Lexer& inLexer, DataBuffer& dataBuffer): ast(), lexer(inLexer), dataBuffer(dataBuffer) {}
 
 protected:
 	AST ast;
 	Lexer& lexer;
+	DataBuffer& dataBuffer;
 
 public:
 	void GenerateAST();
@@ -229,24 +311,24 @@ public:
 
 	void ParseGlslContent(Token& token, CodeFragment codeFragment);
 
-	inline void DeclarationGlsl();//TODO:remove inline
+	inline void DeclarationGlsl(); //TODO:remove inline
 
 	inline void DeclarationShaderStage(Pass::Stage& out_stage);
 
 	inline void PassIdentifier(const Token& token, Pass& pass);
 
 	inline void DeclarationPass();
-	
+
 	inline void DeclarationProperties();
 
 	bool NumberAndIdentifier(Token& token);
 
 	void ParsePropertyDefaultValue(Property* property, Token token);
 
-	void DeclarationProperty(const IndirecString& name );
+	void DeclarationProperty(const IndirecString& name);
 
-	PropertyType PropertyTypeIdentifier( const Token& token );
-	
+	PropertyType PropertyTypeIdentifier(const Token& token);
+
 	Lexer CacheLexer(const Lexer& lexer);
 
 	inline void Identifier(const Token& token);
@@ -269,5 +351,5 @@ protected:
 
 void CompileHFX(const std::string& filePath);
 
-void CompileShaderEffectFile();
+void CompileShaderEffectFile(AST& ast, const DataBuffer& dataBuffer);
 }
