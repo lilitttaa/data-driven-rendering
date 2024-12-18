@@ -57,7 +57,7 @@ public:
 
 	virtual void Init() override
 	{
-		HFX::compileHFX(PathManager::GetHFXDir() + "Ball.hfx");
+		HFX::CompileHFX(PathManager::GetHFXDir() + "Ball.hfx");
 // glfw: initialize and configure
 		// ------------------------------
 		glfwInit();

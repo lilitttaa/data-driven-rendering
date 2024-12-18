@@ -2,34 +2,34 @@
 
 namespace HFX
 {
-class IndirecString
+class IndirectString
 {
 public:
-	IndirecString(): length(0), text(nullptr) {}
-	size_t length;
-	char const* text;
+	IndirectString(): length_(0), text_(nullptr) {}
+	size_t length_;
+	char const* text_;
 
-	static bool Equals(const IndirecString& a, const IndirecString& b);
+	static bool Equals(const IndirectString& a, const IndirectString& b);
 
-	static void Copy(const IndirecString& a, char* buffer, size_t bufferSize)
+	static void Copy(const IndirectString& a, char* buffer, size_t buffer_size)
 	{
-		const size_t copy_size = a.length < bufferSize
-		                         ? a.length
-		                         : bufferSize;
-		for (size_t i = 0; i < copy_size; ++i) { buffer[i] = a.text[i]; }
+		const size_t copy_size = a.length_ < buffer_size
+		                         ? a.length_
+		                         : buffer_size;
+		for (size_t i = 0; i < copy_size; ++i) { buffer[i] = a.text_[i]; }
 	}
 
-	friend std::ostream& operator<<(std::ostream& os, const IndirecString& str);
+	friend std::ostream& operator<<(std::ostream& os, const IndirectString& str);
 
 	std::string ToString() const
 	{
 		std::string str;
-		for (size_t i = 0; i < length; ++i) { str += text[i]; }
+		for (size_t i = 0; i < length_; ++i) { str += text_[i]; }
 		return str;
 	}
 };
 
-std::ostream& operator<<(std::ostream& os, const IndirecString& str);
+std::ostream& operator<<(std::ostream& os, const IndirectString& str);
 
 class StringBuffer
 {
@@ -40,7 +40,7 @@ public:
 
 	void AppendFormat(const char* format, ...);
 
-	void AppendIndirectString(const IndirecString& text);
+	void AppendIndirectString(const IndirectString& text);
 
 	void AppendMemory(void* memory, uint32_t size);
 
@@ -53,29 +53,29 @@ public:
 	const char* CStr() const;
 
 protected:
-	std::vector<char> data;
+	std::vector<char> data_;
 };
 
 class DataBuffer
 {
 public:
 	// Constructor
-	DataBuffer(uint32_t maxEntries, uint32_t bufferSize);
+	DataBuffer(uint32_t max_entries, uint32_t buffer_size);
 
 	// Destructor
 	~DataBuffer() = default;
 
 	void Reset();
 
-	uint32_t AddData(double inData);
+	uint32_t AddData(double in_data);
 
-	void GetData(uint32_t entryIndex, float& value) const;
+	void GetData(uint32_t entry_index, float& value) const;
 
 	uint32_t GetLastEntryIndex() const;
 
 	void Print()
 	{
-		for (uint32_t i = 0; i < currentSize; ++i)
+		for (uint32_t i = 0; i < current_size_; ++i)
 		{
 			float value;
 			GetData(i, value);
@@ -92,12 +92,12 @@ protected:
 		Entry() : offset(0), type(0) {}
 	};
 
-	std::vector<Entry> entries;
-	std::vector<char> data;
-	uint32_t maxEntries;
-	uint32_t currentEntryTrailIndex; //Index the element after the last element
-	uint32_t bufferSize;
-	uint32_t currentSize;
+	std::vector<Entry> entries_;
+	std::vector<char> data_;
+	uint32_t max_entries_;
+	uint32_t current_entry_trail_index_; //Index the element after the last element
+	uint32_t buffer_size_;
+	uint32_t current_size_;
 };
 
 // No need for init_data_buffer and terminate_data_buffer functions
@@ -107,51 +107,51 @@ struct CodeFragment;
 
 enum class TokenType
 {
-	Token_Unknown,
-	Token_OpenParen,
-	Token_CloseParen,
-	Token_Colon,
-	Token_Semicolon,
-	Token_Asterisk,
-	Token_OpenBracket,
-	Token_CloseBracket,
-	Token_OpenBrace,
-	Token_CloseBrace,
-	Token_OpenAngleBracket,
-	Token_CloseAngleBracket,
-	Token_Equals,
-	Token_Hash,
-	Token_Comma,
-	Token_String,
-	Token_Identifier,
-	Token_Number,
-	Token_EndOfStream,
+	kToken_Unknown,
+	kToken_OpenParen,
+	kToken_CloseParen,
+	kToken_Colon,
+	kToken_Semicolon,
+	kToken_Asterisk,
+	kToken_OpenBracket,
+	kToken_CloseBracket,
+	kToken_OpenBrace,
+	kToken_CloseBrace,
+	kToken_OpenAngleBracket,
+	kToken_CloseAngleBracket,
+	kToken_Equals,
+	kToken_Hash,
+	kToken_Comma,
+	kToken_String,
+	kToken_Identifier,
+	kToken_Number,
+	kToken_EndOfStream,
 };
 
 struct Token
 {
-	TokenType type;
-	IndirecString text;
+	TokenType type_;
+	IndirectString text_;
 	typedef TokenType Type;
-	uint32_t line;
+	uint32_t line_;
 
-	void Init(char const* position, uint32_t inLine)
+	void Init(char const* position, uint32_t in_line)
 	{
-		type = TokenType::Token_Unknown;
-		text.text = position;
-		text.length = 1;
-		line = inLine;
+		type_ = TokenType::kToken_Unknown;
+		text_.text_ = position;
+		text_.length_ = 1;
+		line_ = in_line;
 	}
 };
 
 enum class ShaderStage
 {
-	Vertex = 0, Fragment, Geometry, Compute, Hull, Domain, Count
+	kVertex = 0, kFragment, kGeometry, kCompute, kHull, kDomain, kCount
 };
 
 enum class ResourceType
 {
-	Sampler, Texture, TextureRW, Constants, Buffer, BufferRW, Count
+	kSampler, kTexture, kTextureRW, kConstants, kBuffer, kBufferRW, kCount
 };
 
 struct Pass
@@ -159,12 +159,12 @@ struct Pass
 	struct Stage
 	{
 		const CodeFragment* code = nullptr;
-		ShaderStage stage = ShaderStage::Count;
+		ShaderStage stage = ShaderStage::kCount;
 	};
 
-	IndirecString name;
+	IndirectString name_;
 	// StringRef stage_name;
-	std::vector<Stage> shaderStages;
+	std::vector<Stage> shader_stages_;
 	//
 	// std::vector<const ResourceList*> resource_lists; // List used by the pass
 	// const VertexLayout* vertex_layout;
@@ -173,27 +173,27 @@ struct Pass
 
 enum PropertyType
 {
-	Float, Int, Range, Color, Vector, Texture1D, Texture2D, Texture3D, TextureVolume, Unknown
+	kFloat, kInt, kRange, kColor, kVector, kTexture1D, kTexture2D, kTexture3D, kTextureVolume, kUnknown
 };
 
 #define INVALID_PROPERTY_DATA_INDEX 0xFFFFFFFF
 
 struct Property
 {
-	IndirecString name;
-	IndirecString uiName;
-	IndirecString defaultValue;
-	PropertyType type;
-	uint32_t offsetInBytes = 0;
-	uint32_t dataIndex = INVALID_PROPERTY_DATA_INDEX;
+	IndirectString name_;
+	IndirectString ui_name_;
+	IndirectString default_value_;
+	PropertyType type_;
+	uint32_t offset_in_bytes_ = 0;
+	uint32_t data_index_ = INVALID_PROPERTY_DATA_INDEX;
 };
 
 struct AST
 {
-	IndirecString name;
-	std::vector<CodeFragment> codeFragments;
-	std::vector<Pass> passes;
-	std::vector<Property*> properties;
+	IndirectString name_;
+	std::vector<CodeFragment> code_fragments_;
+	std::vector<Pass> passes_;
+	std::vector<Property*> properties_;
 
 	void Print();
 };
@@ -202,31 +202,31 @@ struct CodeFragment
 {
 	struct Resource
 	{
-		ResourceType type;
-		IndirecString name;
+		ResourceType type_;
+		IndirectString name_;
 	};
 
-	std::vector<IndirecString> includes;
-	std::vector<uint32_t> includesFlags; // TODO: what is this?
-	std::vector<Resource> resources; // Resources used in the code.
+	std::vector<IndirectString> includes_;
+	std::vector<uint32_t> includes_flags_; // TODO: what is this?
+	std::vector<Resource> resources_; // Resources used in the code.
 
-	IndirecString name;
-	IndirecString code;
-	ShaderStage currentStage = ShaderStage::Count;
-	uint32_t ifdefDepth = 0;
-	uint32_t stageIfdefDepth[ShaderStage::Count];
+	IndirectString name_;
+	IndirectString code_;
+	ShaderStage current_stage_ = ShaderStage::kCount;
+	uint32_t if_def_depth_ = 0;
+	uint32_t stage_if_def_depth_[ShaderStage::kCount];
 };
 
 class Lexer
 {
 public:
-	Lexer(const std::string& source, DataBuffer& inDataBuffer);
+	Lexer(const std::string& source, DataBuffer& in_data_buffer);
 
 	Lexer(const Lexer& other);
 
 	Lexer& operator=(const Lexer& other);
 
-	void GetTokenTextFromString(IndirecString& token);
+	void GetTokenTextFromString(IndirectString& token);
 
 	bool IsIdOrKeyword(char c);
 
@@ -269,47 +269,47 @@ private:
 
 	int32_t HandleDecimalPart();
 
-	void HandleFractionalPart(int32_t& fractionalPart, int32_t& fractionalDivisor);
+	void HandleFractionalPart(int32_t& fractional_part, int32_t& fractional_divisor);
 
 	void HandleExponent();
 
 protected:
-	char const* position;
-	uint32_t line;
-	uint32_t column;
-	bool hasError;
-	uint32_t errorLine;
-	DataBuffer& dataBuffer;
+	char const* position_;
+	uint32_t line_;
+	uint32_t column_;
+	bool has_error_;
+	uint32_t error_line_;
+	DataBuffer& data_buffer_;
 };
 
 class Parser
 {
 public:
-	explicit Parser(Lexer& inLexer, DataBuffer& dataBuffer): ast(), lexer(inLexer), dataBuffer(dataBuffer) {}
+	explicit Parser(Lexer& in_lexer, DataBuffer& data_buffer): ast_(), lexer(in_lexer), data_buffer(data_buffer) {}
 
 protected:
-	AST ast;
+	AST ast_;
 	Lexer& lexer;
-	DataBuffer& dataBuffer;
+	DataBuffer& data_buffer;
 
 public:
 	void GenerateAST();
 
-	AST& GetAST() { return ast; }
+	AST& GetAST() { return ast_; }
 
 	inline void DeclarationShader();
 
-	bool TryParseIfDefined(const Token& token, CodeFragment& codeFragment);
+	bool TryParseIfDefined(const Token& token, CodeFragment& code_fragment);
 
-	bool TryParsePragma(const Token& token, CodeFragment& codeFragment);
+	bool TryParsePragma(const Token& token, CodeFragment& code_fragment);
 
-	bool TryParseEndIf(const Token& token, CodeFragment& codeFragment);
+	bool TryParseEndIf(const Token& token, CodeFragment& code_fragment);
 
-	void DirectiveIdentifier(const Token& token, CodeFragment& codeFragment);
+	void DirectiveIdentifier(const Token& token, CodeFragment& code_fragment);
 
-	void UniformIdentifier(const Token& token, CodeFragment& codeFragment);
+	void UniformIdentifier(const Token& token, CodeFragment& code_fragment);
 
-	void ParseGlslContent(Token& token, CodeFragment codeFragment);
+	void ParseGlslContent(Token& token, CodeFragment code_fragment);
 
 	inline void DeclarationGlsl(); //TODO:remove inline
 
@@ -325,7 +325,7 @@ public:
 
 	void ParsePropertyDefaultValue(Property* property, Token token);
 
-	void DeclarationProperty(const IndirecString& name);
+	void DeclarationProperty(const IndirectString& name);
 
 	PropertyType PropertyTypeIdentifier(const Token& token);
 
@@ -333,7 +333,7 @@ public:
 
 	inline void Identifier(const Token& token);
 
-	const CodeFragment* FindCodeFragment(const IndirecString& name);
+	const CodeFragment* FindCodeFragment(const IndirectString& name);
 };
 
 class ShaderGenerator
@@ -349,7 +349,7 @@ protected:
 	const AST& ast;
 };
 
-void CompileHFX(const std::string& filePath);
+void CompileHFX(const std::string& file_path);
 
-void GeneatePropertiesShaderCodeAndGetDefault(AST& ast, const DataBuffer& dataBuffer, StringBuffer& outDefaults, StringBuffer& outBuffer); //TODO
+void GeneatePropertiesShaderCodeAndGetDefault(AST& ast, const DataBuffer& data_buffer, StringBuffer& out_defaults, StringBuffer& out_buffer); //TODO
 }
