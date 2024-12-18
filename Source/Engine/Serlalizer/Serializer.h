@@ -1,5 +1,6 @@
 ﻿#pragma once
 #include <fstream>
+#include <iostream>
 #include <string>
 
 enum class SerializerAction
@@ -25,3 +26,5 @@ protected:
 	std::fstream stream_;
 	std::string file_path_;
 };
+
+void TestSerializer();
