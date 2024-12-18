@@ -10,7 +10,7 @@ BinarySerializer::BinarySerializer(SerializerAction action, std::string file_pat
 
 BinarySerializer::~BinarySerializer() { stream_.close(); }
 
-template <typename T>
+template <typename T, typename std::enable_if<std::is_trivial<T>::value, bool>::type = true>
 BinarySerializer& BinarySerializer::operator<<(T& value)
 {
 	if (action_ == SerializerAction::kWrite)
@@ -21,6 +21,9 @@ BinarySerializer& BinarySerializer::operator<<(T& value)
 	else { stream_.read(reinterpret_cast<char*>(&value), sizeof(T)); }
 	return *this;
 }
+
+template <typename T, typename std::enable_if<!std::is_trivial<T>::value, bool>::type = true>
+BinarySerializer& BinarySerializer::operator<<(T& value) { throw std::runtime_error("Type not supported by BinarySerializer"); }
 
 BinarySerializer& BinarySerializer::operator<<(std::string& value)
 {
@@ -44,6 +47,7 @@ BinarySerializer& BinarySerializer::operator<<(std::string& value)
 
 void TestSerializer()
 {
+	std::cout << "Starting Serializer Test" << std::endl;
 	int wi = 123;
 	float wf = 3.14f;
 	std::string ws = "Hello, World!";
@@ -67,4 +71,5 @@ void TestSerializer()
 	EXPECT_EQ(wi, ri)
 	EXPECT_EQ(wf, rf)
 	EXPECT_EQ(ws, rs)
+	std::cout << "Serializer Test Finished" << std::endl;
 }

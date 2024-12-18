@@ -16,10 +16,13 @@ public:
 
 	~BinarySerializer();
 
-	template <typename T>
+	template <typename T, typename std::enable_if<std::is_trivial<T>::value, bool>::type = true>
 	BinarySerializer& operator<<(T& value);
 
 	BinarySerializer& operator<<(std::string& value);
+
+	template<typename T, typename std::enable_if<!std::is_trivial<T>::value, bool>::type = true>
+	BinarySerializer& operator<<(T& value);
 
 protected:
 	SerializerAction action_;
