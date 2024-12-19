@@ -10,39 +10,6 @@ BinarySerializer::BinarySerializer(SerializerAction action, std::string file_pat
 
 BinarySerializer::~BinarySerializer() { stream_.close(); }
 
-template <typename T, typename std::enable_if<std::is_trivial<T>::value, bool>::type = true>
-BinarySerializer& BinarySerializer::operator<<(T& value)
-{
-	if (action_ == SerializerAction::kWrite)
-	{
-		const char* buffer = reinterpret_cast<char*>(&value);
-		stream_.write(buffer, sizeof(T));
-	}
-	else { stream_.read(reinterpret_cast<char*>(&value), sizeof(T)); }
-	return *this;
-}
-
-template <typename T, typename std::enable_if<!std::is_trivial<T>::value, bool>::type = true>
-BinarySerializer& BinarySerializer::operator<<(T& value) { throw std::runtime_error("Type not supported by BinarySerializer"); }
-
-BinarySerializer& BinarySerializer::operator<<(std::string& value)
-{
-	if (action_ == SerializerAction::kWrite)
-	{
-		uint32_t size = static_cast<uint32_t>(value.size());
-		stream_.write(reinterpret_cast<char*>(&size), sizeof(uint32_t));
-		stream_.write(value.c_str(), size);
-	}
-	else
-	{
-		uint32_t size = 0;
-		stream_.read(reinterpret_cast<char*>(&size), sizeof(uint32_t));
-		value.resize(size);
-		stream_.read(&value[0], size);
-	}
-	return *this;
-}
-
 #define EXPECT_EQ(a, b) if ((a) != (b)) { std::cout << "Expected: " << a << " Got: " << b << std::endl; }
 
 void TestSerializer()
@@ -51,25 +18,33 @@ void TestSerializer()
 	int wi = 123;
 	float wf = 3.14f;
 	std::string ws = "Hello, World!";
+	HFX::IndirectString wis;
+	wis.text_ = "Hello, World!";
+	wis.length_ = 13;
 	{
 		BinarySerializer serializer(SerializerAction::kWrite, "test.bin");
 		serializer << wi;
 		serializer << wf;
 		serializer << ws;
+		serializer << wis;
 	}
+
 
 	int ri = 0;
 	float rf = 0.0f;
 	std::string rs;
+	HFX::IndirectString ris;
 	{
 		BinarySerializer serializer(SerializerAction::kRead, "test.bin");
 		serializer << ri;
 		serializer << rf;
 		serializer << rs;
+		serializer << ris;
 	}
 
 	EXPECT_EQ(wi, ri)
 	EXPECT_EQ(wf, rf)
 	EXPECT_EQ(ws, rs)
+	EXPECT_EQ(HFX::IndirectString::Equals(wis, ris), true)
 	std::cout << "Serializer Test Finished" << std::endl;
 }
