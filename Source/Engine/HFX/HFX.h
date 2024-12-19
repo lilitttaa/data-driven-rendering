@@ -1,5 +1,9 @@
 #pragma once
 
+#include <iostream>
+#include <string>
+#include <vector>
+
 namespace HFX
 {
 class IndirectString
@@ -158,7 +162,7 @@ struct Pass
 {
 	struct Stage
 	{
-		const CodeFragment* code = nullptr;
+		CodeFragment* code = nullptr;
 		ShaderStage stage = ShaderStage::kCount;
 	};
 
@@ -333,7 +337,7 @@ public:
 
 	inline void Identifier(const Token& token);
 
-	const CodeFragment* FindCodeFragment(const IndirectString& name);
+	CodeFragment* FindCodeFragment(const IndirectString& name);
 };
 
 class ShaderGenerator

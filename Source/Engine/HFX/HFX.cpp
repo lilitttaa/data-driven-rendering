@@ -7,6 +7,7 @@
 #include <cstdarg>
 #include "PathManager.h"
 #include "File/FileReader.h"
+#include "Serlalizer/Serializer.h"
 
 namespace HFX
 {
@@ -971,11 +972,11 @@ void Parser::Identifier(const Token& token)
 	}
 }
 
-const CodeFragment* Parser::FindCodeFragment(const IndirectString& name)
+CodeFragment* Parser::FindCodeFragment(const IndirectString& name)
 {
 	for (uint32_t i = 0; i < ast_.code_fragments_.size(); ++i)
 	{
-		const CodeFragment* type = &ast_.code_fragments_[i];
+		CodeFragment* type = &ast_.code_fragments_[i];
 		if (IndirectString::Equals(name, type->name_)) { return type; }
 	}
 	return nullptr;
@@ -1082,6 +1083,56 @@ void GeneatePropertiesShaderCodeAndGetDefault(AST& ast, const DataBuffer& data_b
 	memcpy(buffer_size_memory, &constants_buffer_size, sizeof(uint32_t));
 }
 
+// void WriteEffectFile(AST& ast, const std::string& file_path)
+// {
+// 	BinarySerializer serializer(SerializerAction::kWrite, file_path);
+// 	const uint32_t pass_count = (uint32_t)ast.passes_.size();
+// 	for (uint32_t i = 0; i < pass_count; i++)
+// 	{
+// 		const Pass& pass = ast.passes_[i];
+// 		for (size_t s = 0; s < pass.shader_stages_.size(); ++s)
+// 		{
+// 			const Pass::Stage& stage = pass.shader_stages_[s];
+// 			serializer << stage.stage;
+// 			serializer << stage.code->name_;
+// 		}
+// 	}
+// }
+
+void DOWork(AST& ast, const std::string& binary_path, SerializerAction action)
+{
+	{
+		BinarySerializer serializer(action, binary_path);
+		uint32_t pass_count = 0;
+		if (serializer.GetAction() == SerializerAction::kWrite)
+		{
+			pass_count = (uint32_t)ast.passes_.size();
+			serializer << pass_count;
+		}
+		else { serializer << pass_count; }
+		ast.passes_.resize(pass_count);
+		for (uint32_t i = 0; i < pass_count; i++)
+		{
+			Pass& pass = ast.passes_[i];
+			uint32_t stage_count = 0;
+			if (serializer.GetAction() == SerializerAction::kWrite)
+			{
+				stage_count = (uint32_t)pass.shader_stages_.size();
+				serializer << stage_count;
+			}
+			else { serializer << stage_count; }
+			pass.shader_stages_.resize(stage_count);
+			for (size_t s = 0; s < stage_count; ++s)
+			{
+				Pass::Stage& stage = pass.shader_stages_[s];
+				serializer << stage.stage;
+				serializer << stage.code->name_;
+			}
+			
+		}
+	}
+}
+
 void CompileHFX(const std::string& file_path)
 {
 	std::string content = FileReader(file_path).Read();
@@ -1101,5 +1152,9 @@ void CompileHFX(const std::string& file_path)
 	StringBuffer out_defaults;
 	StringBuffer out_buffer;
 	GeneatePropertiesShaderCodeAndGetDefault(ast, data_buffer, out_defaults, out_buffer);
+
+	DOWork(ast, ST::PathManager::GetHFXDir() + "shader_effect.bin", SerializerAction::kWrite);
+	AST ast2;
+	DOWork(ast2, ST::PathManager::GetHFXDir() + "shader_effect.bin", SerializerAction::kRead);
 }
 }
