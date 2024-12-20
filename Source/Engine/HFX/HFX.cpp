@@ -213,6 +213,141 @@ std::ostream& operator<<(std::ostream& os, const ShaderEffect& shader_effect)
 	return os;
 }
 
+BinarySerializer& operator<<(BinarySerializer& serializer, Property& property)
+{
+	serializer << property.name_;
+	serializer << property.ui_name_;
+	serializer << property.type_;
+	if (property.type_ == graphics::PropertyType::kFloat) { serializer << static_cast<FloatProperty&>(property); }
+	else if (property.type_ == graphics::PropertyType::kInt) { serializer << static_cast<IntProperty&>(property); }
+	else if (property.type_ == graphics::PropertyType::kRange) { serializer << static_cast<RangeProperty&>(property); }
+	else if (property.type_ == graphics::PropertyType::kTexture2D) { serializer << static_cast<TextureProperty&>(property); }
+	else { throw std::runtime_error("Property type not supported"); }
+	return serializer;
+}
+
+BinarySerializer& operator<<(BinarySerializer& serializer, std::shared_ptr<Property>& property_ptr)
+{
+	std::string* name = nullptr;
+	std::string* ui_name = nullptr;
+	graphics::PropertyType* type = nullptr;
+	if (serializer.GetAction() == SerializerAction::kWrite)
+	{
+		name = &property_ptr->name_;
+		ui_name = &property_ptr->ui_name_;
+		type = &property_ptr->type_;
+	}
+	else
+	{
+		name = new std::string();
+		ui_name = new std::string();
+		type = new graphics::PropertyType();
+	}
+	serializer << *name;
+	serializer << *ui_name;
+	serializer << *type;
+	if (serializer.GetAction() == SerializerAction::kRead)
+	{
+		if (*type == graphics::PropertyType::kFloat) { property_ptr = std::make_shared<FloatProperty>(); }
+		else if (*type == graphics::PropertyType::kInt) { property_ptr = std::make_shared<IntProperty>(); }
+		else if (*type == graphics::PropertyType::kRange) { property_ptr = std::make_shared<RangeProperty>(); }
+		else if (*type == graphics::PropertyType::kTexture2D) { property_ptr = std::make_shared<TextureProperty>(); }
+		else { throw std::runtime_error("Property type not supported"); }
+		property_ptr->name_ = *name;
+		property_ptr->ui_name_ = *ui_name;
+		property_ptr->type_ = *type;
+	}
+
+	if (property_ptr->type_ == graphics::PropertyType::kFloat) { serializer << static_cast<FloatProperty&>(*property_ptr); }
+	else if (property_ptr->type_ == graphics::PropertyType::kInt) { serializer << static_cast<IntProperty&>(*property_ptr); }
+	else if (property_ptr->type_ == graphics::PropertyType::kRange) { serializer << static_cast<RangeProperty&>(*property_ptr); }
+	else if (property_ptr->type_ == graphics::PropertyType::kTexture2D) { serializer << static_cast<TextureProperty&>(*property_ptr); }
+	else { throw std::runtime_error("Property type not supported"); }
+	return serializer;
+}
+
+BinarySerializer& operator<<(BinarySerializer& serializer, IntProperty& int_property)
+{
+	serializer << int_property.default_value_;
+	return serializer;
+}
+
+BinarySerializer& operator<<(BinarySerializer& serializer, FloatProperty& float_property)
+{
+	serializer << float_property.default_value_;
+	return serializer;
+}
+
+BinarySerializer& operator<<(BinarySerializer& serializer, RangeProperty& range_property)
+{
+	serializer << range_property.min_value_;
+	serializer << range_property.max_value_;
+	serializer << range_property.default_value_;
+	return serializer;
+}
+
+BinarySerializer& operator<<(BinarySerializer& serializer, TextureProperty& texture_property)
+{
+	serializer << texture_property.default_value_;
+	return serializer;
+}
+
+BinarySerializer& operator<<(BinarySerializer& serializer, ResourceBinding& resource_binding)
+{
+	serializer << resource_binding.name_;
+	serializer << resource_binding.type_;
+	return serializer;
+}
+
+BinarySerializer& operator<<(BinarySerializer& serializer, ResourceList& resource_list)
+{
+	serializer << resource_list.name_;
+	serializer << resource_list.resources_;
+	return serializer;
+}
+
+BinarySerializer& operator<<(BinarySerializer& serializer, RenderState& render_state)
+{
+	serializer << render_state.name_;
+	serializer << render_state.rasterization_state_;
+	serializer << render_state.depth_stencil_state_;
+	serializer << render_state.blend_state_;
+	return serializer;
+}
+
+BinarySerializer& operator<<(BinarySerializer& serializer, Shader& shader)
+{
+	serializer << shader.type_;
+	serializer << shader.code_chunk_ref_;
+	return serializer;
+}
+
+BinarySerializer& operator<<(BinarySerializer& serializer, Pass& pass)
+{
+	serializer << pass.name_;
+	serializer << pass.shaders_;
+	serializer << pass.resource_list_refs_;
+	serializer << pass.render_state_ref_;
+	serializer << pass.type_;
+	return serializer;
+}
+
+BinarySerializer& operator<<(BinarySerializer& serializer, Resource& resource)
+{
+	serializer << resource.name_;
+	serializer << resource.type_;
+	return serializer;
+}
+
+BinarySerializer& operator<<(BinarySerializer& serializer, CodeChunk& code_chunk)
+{
+	serializer << code_chunk.name_;
+	serializer << code_chunk.includes_;
+	serializer << code_chunk.resources_;
+	serializer << code_chunk.code_;
+	return serializer;
+}
+
 BinarySerializer& operator<<(BinarySerializer& serializer, ShaderEffect& shader_effect)
 {
 	serializer << shader_effect.name_;
@@ -220,11 +355,7 @@ BinarySerializer& operator<<(BinarySerializer& serializer, ShaderEffect& shader_
 	serializer << shader_effect.code_chunks_;
 	serializer << shader_effect.resource_lists_;
 	serializer << shader_effect.render_states_;
-	// uint32_t properties_size = 0;
-	// if (serializer.GetAction() == SerializerAction::kWrite) { properties_size = static_cast<uint32_t>(shader_effect.properties_.size()); }
-	// serializer << properties_size;
-	// if (serializer.GetAction() == SerializerAction::kRead) { shader_effect.properties_.resize(properties_size); }
-	// for (auto& property : shader_effect.properties_) { serializer << *property; }
+	serializer << shader_effect.properties_;
 	return serializer;
 }
 
@@ -866,7 +997,7 @@ void Parser::ParsePropertyDefaultValue(std::shared_ptr<Property> property, Token
 			data_buffer.GetData(default_value);
 			static_cast<FloatProperty*>(property.get())->default_value_ = default_value;
 		}
-		if (token.type_ == TokenType::kToken_Number && property->type_ == graphics::PropertyType::kInt)
+		else if (token.type_ == TokenType::kToken_Number && property->type_ == graphics::PropertyType::kInt)
 		{
 			// Cache the data buffer entry index into the property for later retrieval.
 			float default_value = 0.0f;
@@ -898,6 +1029,9 @@ public:
 			case graphics::PropertyType::kInt: return std::make_shared<IntProperty>();
 			case graphics::PropertyType::kFloat: return std::make_shared<FloatProperty>();
 			case graphics::PropertyType::kRange: return std::make_shared<RangeProperty>();
+			case graphics::PropertyType::kTexture1D: return std::make_shared<TextureProperty>();
+			case graphics::PropertyType::kTexture2D: return std::make_shared<TextureProperty>();
+			case graphics::PropertyType::kTexture3D: return std::make_shared<TextureProperty>();
 			default: throw std::runtime_error("Invalid property type.");
 		}
 	}

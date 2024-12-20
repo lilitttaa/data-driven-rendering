@@ -2,8 +2,7 @@
 #include <fstream>
 #include <iostream>
 #include <string>
-
-#include "HFX/HFX.h"
+#include <vector>
 
 enum class SerializerAction
 {
@@ -26,6 +25,9 @@ public:
 	
 	template <typename U>
 	BinarySerializer& operator<<(std::vector<U>& value);
+
+	template <typename U>
+	BinarySerializer& operator<<(std::shared_ptr<U>& value);
 
 	SerializerAction GetAction() const { return action_; }
 
@@ -81,6 +83,24 @@ BinarySerializer& BinarySerializer::operator<<(std::vector<U>& value)
 		stream_.read(reinterpret_cast<char*>(&size), sizeof(uint32_t));
 		value.resize(size);
 		for (auto& element : value) { *this << element; }
+	}
+	return *this;
+}
+
+template <typename U>
+BinarySerializer& BinarySerializer::operator<<(std::shared_ptr<U>& value) {
+	if (action_ == SerializerAction::kWrite)
+	{
+		bool isNull = value == nullptr;
+		*this << isNull;
+		if (!isNull) { *this << *value; }
+	}
+	else
+	{
+		bool isNull = false;
+		*this << isNull;
+		value = std::make_shared<U>();
+		if (!isNull) { *this << *value; }
 	}
 	return *this;
 }

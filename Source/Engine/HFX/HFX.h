@@ -160,16 +160,20 @@ struct Property
 	std::string name_;
 	std::string ui_name_;
 	graphics::PropertyType type_;
+	friend BinarySerializer& operator<<(BinarySerializer& serializer, Property& property);
+	friend BinarySerializer& operator<<(BinarySerializer& serializer, std::shared_ptr<Property>& property_ptr);
 };
 
 struct IntProperty : Property
 {
 	int default_value_;
+	friend BinarySerializer& operator<<(BinarySerializer& serializer, IntProperty& int_property);
 };
 
 struct FloatProperty : Property
 {
 	float default_value_;
+	friend BinarySerializer& operator<<(BinarySerializer& serializer, FloatProperty& float_property);
 };
 
 struct RangeProperty : Property
@@ -177,23 +181,28 @@ struct RangeProperty : Property
 	float min_value_;
 	float max_value_;
 	float default_value_;
+	friend BinarySerializer& operator<<(BinarySerializer& serializer, RangeProperty& range_property);
 };
 
-struct StringProperty : Property
+struct TextureProperty: Property
 {
 	std::string default_value_;
+	friend BinarySerializer& operator<<(BinarySerializer& serializer, TextureProperty& texture_property);
 };
+
 
 struct ResourceBinding
 {
 	std::string name_;
 	graphics::ResourceType type_;
+	friend BinarySerializer& operator<<(BinarySerializer& serializer, ResourceBinding& resource_binding);
 };
 
 struct ResourceList
 {
 	std::string name_;
 	std::vector<ResourceBinding> resources_;
+	friend BinarySerializer& operator<<(BinarySerializer& serializer, ResourceList& resource_list);
 };
 
 struct RenderState
@@ -202,12 +211,14 @@ struct RenderState
 	graphics::RasterizationState rasterization_state_;
 	graphics::DepthStencilState depth_stencil_state_;
 	graphics::BlendState blend_state_;
+	friend BinarySerializer& operator<<(BinarySerializer& serializer, RenderState& render_state);
 };
 
 struct Shader
 {
 	graphics::ShaderType type_;
 	int code_chunk_ref_;
+	friend BinarySerializer& operator<<(BinarySerializer& serializer, Shader& shader);
 };
 
 struct Pass
@@ -217,12 +228,15 @@ struct Pass
 	std::vector<int> resource_list_refs_;
 	int render_state_ref_;
 	graphics::PassType type_;
+
+	friend BinarySerializer& operator<<(BinarySerializer& serializer, Pass& pass);
 };
 
 struct Resource
 {
 	graphics::ResourceType type_;
 	std::string name_;
+	friend BinarySerializer& operator<<(BinarySerializer& serializer, Resource& resource);
 };
 
 struct CodeChunk
@@ -231,6 +245,7 @@ struct CodeChunk
 	std::vector<std::string> includes_;
 	std::vector<Resource> resources_; // represent the resource layout
 	std::string code_;
+	friend BinarySerializer& operator<<(BinarySerializer& serializer, CodeChunk& code_chunk);
 };
 
 struct ShaderEffect

@@ -1,4 +1,4 @@
-shader BallShader {
+effect BallShader {
 
 	// For the artist
     properties {
