@@ -1,9 +1,7 @@
 #pragma once
-
 #include <iostream>
 #include <string>
 #include <vector>
-
 #include "Graphics/Graphics.h"
 #include "Serlalizer/Serializer.h"
 
@@ -50,7 +48,7 @@ public:
 	void AppendFormat(const char* format, ...);
 
 	void AppendIndirectString(const IndirectString& text);
-	
+
 	void AppendString(const std::string& text);
 
 	void AppendMemory(void* memory, uint32_t size);
@@ -162,19 +160,23 @@ struct Property
 	std::string name_;
 	std::string ui_name_;
 	graphics::PropertyType type_;
+
 	friend BinarySerializer& operator<<(BinarySerializer& serializer, Property& property);
+
 	friend BinarySerializer& operator<<(BinarySerializer& serializer, std::shared_ptr<Property>& property_ptr);
 };
 
 struct IntProperty : Property
 {
 	int default_value_;
+
 	friend BinarySerializer& operator<<(BinarySerializer& serializer, IntProperty& int_property);
 };
 
 struct FloatProperty : Property
 {
 	float default_value_;
+
 	friend BinarySerializer& operator<<(BinarySerializer& serializer, FloatProperty& float_property);
 };
 
@@ -183,20 +185,22 @@ struct RangeProperty : Property
 	float min_value_;
 	float max_value_;
 	float default_value_;
+
 	friend BinarySerializer& operator<<(BinarySerializer& serializer, RangeProperty& range_property);
 };
 
-struct TextureProperty: Property
+struct TextureProperty : Property
 {
 	std::string default_value_;
+
 	friend BinarySerializer& operator<<(BinarySerializer& serializer, TextureProperty& texture_property);
 };
-
 
 struct ResourceBinding
 {
 	std::string name_;
 	graphics::ResourceType type_;
+
 	friend BinarySerializer& operator<<(BinarySerializer& serializer, ResourceBinding& resource_binding);
 };
 
@@ -204,6 +208,7 @@ struct ResourceList
 {
 	std::string name_;
 	std::vector<ResourceBinding> resources_;
+
 	friend BinarySerializer& operator<<(BinarySerializer& serializer, ResourceList& resource_list);
 };
 
@@ -213,6 +218,7 @@ struct RenderState
 	graphics::RasterizationState rasterization_state_;
 	graphics::DepthStencilState depth_stencil_state_;
 	graphics::BlendState blend_state_;
+
 	friend BinarySerializer& operator<<(BinarySerializer& serializer, RenderState& render_state);
 };
 
@@ -220,6 +226,7 @@ struct Shader
 {
 	graphics::ShaderType type_;
 	int code_chunk_ref_;
+
 	friend BinarySerializer& operator<<(BinarySerializer& serializer, Shader& shader);
 };
 
@@ -238,6 +245,7 @@ struct Resource
 {
 	graphics::ResourceType type_;
 	std::string name_;
+
 	friend BinarySerializer& operator<<(BinarySerializer& serializer, Resource& resource);
 };
 
@@ -247,6 +255,7 @@ struct CodeChunk
 	std::vector<std::string> includes_;
 	std::vector<Resource> resources_; // represent the resource layout
 	std::string code_;
+
 	friend BinarySerializer& operator<<(BinarySerializer& serializer, CodeChunk& code_chunk);
 };
 
@@ -264,82 +273,7 @@ struct ShaderEffect
 	friend std::ostream& operator<<(std::ostream& os, const ShaderEffect& shader_effect);
 };
 
-// std::ostream& operator<<(std::ostream& os, const ShaderEffect& shader_effect);
-//
-// BinarySerializer& operator<<(BinarySerializer& serializer, ShaderEffect& shader_effect);
-
-// enum class ShaderStage
-// {
-// 	kVertex = 0, kFragment, kGeometry, kCompute, kHull, kDomain, kCount
-// };
-
-// enum class ResourceType
-// {
-// 	kSampler, kTexture, kTextureRW, kConstants, kBuffer, kBufferRW, kCount
-// };
-
-// struct Pass
-// {
-// 	struct Stage
-// 	{
-// 		CodeFragment* code = nullptr;
-// 		ShaderStage stage = ShaderStage::kCount;
-// 	};
-//
-// 	IndirectString name_;
-// 	// StringRef stage_name;
-// 	std::vector<Stage> shader_stages_;
-// 	//
-// 	// std::vector<const ResourceList*> resource_lists; // List used by the pass
-// 	// const VertexLayout* vertex_layout;
-// 	// const RenderState* render_state;
-// };
-
-// enum PropertyType
-// {
-// 	kFloat, kInt, kRange, kColor, kVector, kTexture1D, kTexture2D, kTexture3D, kTextureVolume, kUnknown
-// };
-
 #define INVALID_PROPERTY_DATA_INDEX 0xFFFFFFFF
-
-// struct Property
-// {
-// 	IndirectString name_;
-// 	IndirectString ui_name_;
-// 	IndirectString default_value_;
-// 	PropertyType type_;
-// 	uint32_t offset_in_bytes_ = 0;
-// 	uint32_t data_index_ = INVALID_PROPERTY_DATA_INDEX;
-// };
-//
-// struct AST
-// {
-// 	IndirectString name_;
-// 	std::vector<Pass> passes_;
-// 	std::vector<CodeFragment> code_fragments_;
-// 	std::vector<Property*> properties_;
-//
-// 	void Print();
-// };
-
-// struct CodeFragment
-// {
-// 	struct Resource
-// 	{
-// 		ResourceType type_;
-// 		IndirectString name_;
-// 	};
-//
-// 	std::vector<IndirectString> includes_;
-// 	std::vector<uint32_t> includes_flags_; // TODO: what is this?
-// 	std::vector<Resource> resources_; // Resources used in the code.
-//
-// 	IndirectString name_;
-// 	IndirectString code_;
-// 	ShaderStage current_stage_ = ShaderStage::kCount;
-// 	uint32_t if_def_depth_ = 0;
-// 	uint32_t stage_if_def_depth_[ShaderStage::kCount];
-// };
 
 class Lexer
 {
@@ -475,6 +409,4 @@ protected:
 };
 
 void CompileHFX(const std::string& file_path);
-
-// void GeneatePropertiesShaderCodeAndGetDefault(AST& ast, const DataBuffer& data_buffer, StringBuffer& out_defaults, StringBuffer& out_buffer); //TODO
 }

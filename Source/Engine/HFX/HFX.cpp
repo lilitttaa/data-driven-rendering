@@ -106,10 +106,7 @@ void StringBuffer::AppendIndirectString(const IndirectString& text)
 	if (text.length_ > 0) { data_.insert(data_.end(), text.text_, text.text_ + text.length_); }
 }
 
-void StringBuffer::AppendString(const std::string& text)
-{
-	if (text.length() > 0) { data_.insert(data_.end(), text.begin(), text.end()); }
-}
+void StringBuffer::AppendString(const std::string& text) { if (text.length() > 0) { data_.insert(data_.end(), text.begin(), text.end()); } }
 
 void StringBuffer::AppendMemory(void* memory, uint32_t size)
 {
@@ -177,44 +174,36 @@ void DataBuffer::GetData(float& value) const { GetData(GetLastEntryIndex(), valu
 
 uint32_t DataBuffer::GetLastEntryIndex() const { return current_entry_trail_index_ - 1; }
 
-// void AST::Print()
-// {
-// 	std::cout << "Shader: " << name_ << std::endl;
-// 	for (const auto& code_fragment : code_fragments_)
-// 	{
-// 		std::cout << "CodeFragment: " << code_fragment.name_ << std::endl;
-// 		std::cout << "Code: " << code_fragment.code_ << std::endl;
-// 		std::cout << "Ifdef Depth: " << code_fragment.if_def_depth_ << std::endl;
-// 		std::cout << "Current Stage: " << static_cast<uint32_t>(code_fragment.current_stage_) << std::endl;
-// 		for (const auto& resource : code_fragment.resources_) { std::cout << "Resource: " << resource.name_ << std::endl; }
-// 		for (const auto& include : code_fragment.includes_) { std::cout << "Include: " << include << std::endl; }
-// 		for (const auto& include_flag : code_fragment.includes_flags_) { std::cout << "Include Flag: " << include_flag << std::endl; }
-// 		for (size_t i = 0; i < static_cast<uint32_t>(ShaderStage::kCount); i++)
-// 		{
-// 			std::cout << "Stage Ifdef Depth: " << code_fragment.stage_if_def_depth_[i] << std::endl;
-// 		}
-// 	}
-// 	for (const auto& pass : passes_)
-// 	{
-// 		std::cout << "Pass: " << pass.name_ << std::endl;
-// 		for (const auto& shader_stage : pass.shader_stages_)
-// 		{
-// 			std::cout << shader_stage.stage << "---" << shader_stage.code->name_ << std::endl;
-// 			std::cout << "shader_stage.code->code: " << shader_stage.code->code_ << std::endl;
-// 		}
-// 	}
-// 	for (const auto& property : properties_)
-// 	{
-// 		std::cout << "Property: " << property->name_ << std::endl;
-// 		std::cout << "UI Name: " << property->ui_name_ << std::endl;
-// 		std::cout << "Default Value: " << property->default_value_ << std::endl;
-// 		std::cout << "Type: " << property->type_ << std::endl;
-// 	}
-// }
-
 std::ostream& operator<<(std::ostream& os, const ShaderEffect& shader_effect)
 {
-	os << "Shader Effect: " << shader_effect.name_ << std::endl;
+	// os << "Shader Effect: " << shader_effect.name_ << std::endl;
+
+	std::cout << "Shader: " << shader_effect.name_ << std::endl;
+	for (const auto& code_chunk : shader_effect.code_chunks_)
+	{
+		std::cout << "CodeChunk: " << code_chunk.name_ << std::endl;
+		std::cout << "Code: " << code_chunk.code_ << std::endl;
+		// std::cout << "Ifdef Depth: " << code_chunk.if_def_depth_ << std::endl;
+		// std::cout << "Current Stage: " << static_cast<uint32_t>(code_chunk.current_stage_) << std::endl;
+		for (const auto& resource : code_chunk.resources_) { std::cout << "Resource: " << resource.name_ << std::endl; }
+		for (const auto& include : code_chunk.includes_) { std::cout << "Include: " << include << std::endl; }
+		// for (const auto& include_flag : code_chunk.includes_flags_) { std::cout << "Include Flag: " << include_flag << std::endl; }
+		for (size_t i = 0; i < static_cast<uint32_t>(graphics::ShaderType::kCount); i++)
+		{
+			// std::cout << "Stage Ifdef Depth: " << code_chunk.stage_if_def_depth_[i] << std::endl;
+		}
+	}
+	for (const auto& pass : shader_effect.passes_)
+	{
+		std::cout << "Pass: " << pass.name_ << std::endl;
+		for (const auto& shader : pass.shaders_) { std::cout << shader.type_ << "---" << shader.code_chunk_ref_ << std::endl; }
+	}
+	for (const auto& property : shader_effect.properties_)
+	{
+		std::cout << "Property: " << property->name_ << std::endl;
+		std::cout << "UI Name: " << property->ui_name_ << std::endl;
+		std::cout << "Type: " << static_cast<int>(property->type_) << std::endl;
+	}
 	return os;
 }
 
@@ -635,7 +624,6 @@ void Parser::DeclarationEffect()
 	Token token;
 	if (!lexer.ExpectToken(token, TokenType::kToken_Identifier)) { return; }
 
-	// ast_.name_ = token.text_;
 	shader_effect_.name_ = token.text_.ToString();
 
 	if (!lexer.ExpectToken(token, TokenType::kToken_OpenBrace)) { return; }
@@ -844,26 +832,20 @@ void Parser::DeclarationGlsl()
 {
 	Token token;
 	if (!lexer.ExpectToken(token, TokenType::kToken_Identifier)) { return; }
-	// CodeFragment code_fragment = {};
+
 	CodeChunk code_chunk = {};
 	code_chunk.name_ = token.text_.ToString();
-	// code_fragment.name_ = token.text_;
-
-	// for (size_t i = 0; i < static_cast<uint32_t>(graphics::ShaderType::kCount); i++) { code_fragment.stage_if_def_depth_[i] = 0xffffffff; }
 
 	if (!lexer.ExpectToken(token, TokenType::kToken_OpenBrace)) { return; }
 
 	lexer.NextToken(token);
 	IndirectString code = token.text_;
-	// code_fragment.code_.text_ = token.text_.text_;
 
 	ParseGlslContent(token, code_chunk);
-	// code_fragment.code_.length_ = token.text_.text_ - code_fragment.code_.text_;
 	code.length_ = token.text_.text_ - code.text_;
 	code_chunk.code_ = code.ToString();
 
 	shader_effect_.code_chunks_.emplace_back(code_chunk);
-	// ast_.code_fragments_.emplace_back(code_fragment);
 }
 
 void Parser::DeclarationShader(Shader& out_shader)
@@ -935,14 +917,11 @@ void Parser::DeclarationPass()
 	if (!lexer.ExpectToken(token, TokenType::kToken_Identifier)) { return; }
 
 	Pass pass = {};
-	// Cache name string
-	// pass.name_ = token.text_;
 	pass.name_ = token.text_.ToString();
 
 	if (!lexer.ExpectToken(token, TokenType::kToken_OpenBrace)) { return; }
 	while (!lexer.EqualToken(token, TokenType::kToken_CloseBrace)) { PassIdentifier(token, pass); }
 	shader_effect_.passes_.emplace_back(pass);
-	// ast_.passes_.emplace_back(pass);
 }
 
 void Parser::DeclarationProperties()
@@ -1066,7 +1045,6 @@ void Parser::DeclarationProperty(const IndirectString& name)
 	ParsePropertyDefaultValue(property, token);
 
 	shader_effect_.properties_.push_back(property);
-	// ast_.properties_.push_back(property);
 }
 
 graphics::PropertyType Parser::PropertyTypeIdentifier(const Token& token)
@@ -1186,7 +1164,6 @@ int Parser::FindCodeChunk(const std::string& name)
 	return -1;
 }
 
-
 ShaderGenerator::ShaderGenerator(const ShaderEffect& shader_effect): shader_effect_(shader_effect) {}
 
 void ShaderGenerator::GenerateShaders(const std::string& path)
@@ -1195,13 +1172,13 @@ void ShaderGenerator::GenerateShaders(const std::string& path)
 	for (uint32_t i = 0; i < pass_count; i++)
 	{
 		const Pass& pass = shader_effect_.passes_[i];
-		for (size_t s = 0; s < pass.shaders_.size(); ++s) { OutputShader(path, pass.shaders_[s],shader_effect_.code_chunks_); }
+		for (size_t s = 0; s < pass.shaders_.size(); ++s) { OutputShader(path, pass.shaders_[s], shader_effect_.code_chunks_); }
 	}
 }
 
 void ShaderGenerator::OutputShader(const std::string& path, const Shader& shader, const std::vector<CodeChunk>& code_chunks)
 {
-	if(static_cast<int>(code_chunks.size()) <= shader.code_chunk_ref_)
+	if (static_cast<int>(code_chunks.size()) <= shader.code_chunk_ref_)
 		throw std::runtime_error("Code chunk index out of bounds.");
 	const CodeChunk& code_chunk = code_chunks[shader.code_chunk_ref_];
 
@@ -1287,55 +1264,6 @@ void GeneatePropertiesShaderCode(ShaderEffect& shader_effect, StringBuffer& out_
 	// memcpy(buffer_size_memory, &constants_buffer_size, sizeof(uint32_t));
 }
 
-// void WriteEffectFile(AST& ast, const std::string& file_path)
-// {
-// 	BinarySerializer serializer(SerializerAction::kWrite, file_path);
-// 	const uint32_t pass_count = (uint32_t)ast.passes_.size();
-// 	for (uint32_t i = 0; i < pass_count; i++)
-// 	{
-// 		const Pass& pass = ast.passes_[i];
-// 		for (size_t s = 0; s < pass.shader_stages_.size(); ++s)
-// 		{
-// 			const Pass::Stage& stage = pass.shader_stages_[s];
-// 			serializer << stage.stage;
-// 			serializer << stage.code->name_;
-// 		}
-// 	}
-// }
-
-// void DOWork(AST& ast, const std::string& binary_path, SerializerAction action)
-// {
-// 	{
-// 		BinarySerializer serializer(action, binary_path);
-// 		uint32_t pass_count = 0;
-// 		if (serializer.GetAction() == SerializerAction::kWrite)
-// 		{
-// 			pass_count = (uint32_t)ast.passes_.size();
-// 			serializer << pass_count;
-// 		}
-// 		else { serializer << pass_count; }
-// 		ast.passes_.resize(pass_count);
-// 		for (uint32_t i = 0; i < pass_count; i++)
-// 		{
-// 			Pass& pass = ast.passes_[i];
-// 			uint32_t stage_count = 0;
-// 			if (serializer.GetAction() == SerializerAction::kWrite)
-// 			{
-// 				stage_count = (uint32_t)pass.shader_stages_.size();
-// 				serializer << stage_count;
-// 			}
-// 			else { serializer << stage_count; }
-// 			pass.shader_stages_.resize(stage_count);
-// 			for (size_t s = 0; s < stage_count; ++s)
-// 			{
-// 				Pass::Stage& stage = pass.shader_stages_[s];
-// 				serializer << stage.stage;
-// 				serializer << stage.code->name_;
-// 			}
-// 		}
-// 	}
-// }
-
 void CompileHFX(const std::string& file_path)
 {
 	std::string content = FileReader(file_path).Read();
@@ -1360,15 +1288,7 @@ void CompileHFX(const std::string& file_path)
 	ShaderGenerator shader_generator(shader_effect2);
 	shader_generator.GenerateShaders(ST::PathManager::GetHFXDir());
 
-	//
-	// // Calculate Output File Path
-	// std::string output_file_path = ""; //TODO
-	//
 	StringBuffer out_buffer;
 	GeneatePropertiesShaderCode(shader_effect2, out_buffer);
-	//
-	// DOWork(ast, ST::PathManager::GetHFXDir() + "shader_effect.bin", SerializerAction::kWrite);
-	// AST ast2;
-	// DOWork(ast2, ST::PathManager::GetHFXDir() + "shader_effect.bin", SerializerAction::kRead);
 }
 }
