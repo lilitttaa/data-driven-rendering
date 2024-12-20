@@ -106,6 +106,11 @@ void StringBuffer::AppendIndirectString(const IndirectString& text)
 	if (text.length_ > 0) { data_.insert(data_.end(), text.text_, text.text_ + text.length_); }
 }
 
+void StringBuffer::AppendString(const std::string& text)
+{
+	if (text.length() > 0) { data_.insert(data_.end(), text.begin(), text.end()); }
+}
+
 void StringBuffer::AppendMemory(void* memory, uint32_t size)
 {
 	if (size > 0) { data_.insert(data_.end(), static_cast<char*>(memory), static_cast<char*>(memory) + size); }
@@ -1181,107 +1186,106 @@ int Parser::FindCodeChunk(const std::string& name)
 	return -1;
 }
 
-//
-// ShaderGenerator::ShaderGenerator(const AST& ast): ast(ast) {}
-//
-// void ShaderGenerator::GenerateShaders(const std::string& path)
-// {
-// 	const uint32_t pass_count = (uint32_t)ast.passes_.size();
-// 	for (uint32_t i = 0; i < pass_count; i++)
-// 	{
-// 		const Pass& pass = ast.passes_[i];
-// 		for (size_t s = 0; s < pass.shader_stages_.size(); ++s) { OutputShaderStage(path, pass.shader_stages_[s]); }
-// 	}
-// }
-//
-// void ShaderGenerator::OutputShaderStage(const std::string& path, const Pass::Stage& stage)
-// {
-// 	const CodeFragment* code_fragment = stage.code;
-// 	if (code_fragment == nullptr)
-// 		return;
-//
-// 	std::string fileName = path + code_fragment->name_.ToString() + "_" + ShaderType2Postfix(stage.stage) + ".glsl";
-// 	std::ofstream file(fileName);
-// 	std::string code = code_fragment->code_.ToString();
-// 	file << "#version 330 core\n";
-// 	file << "#define " << ShaderType2String(stage.stage) << "\n";
-// 	file << code;
-// 	file.close();
-// }
-//
-// void GeneatePropertiesShaderCodeAndGetDefault(AST& ast, const DataBuffer& data_buffer, StringBuffer& out_defaults, StringBuffer& out_buffer)
-// {
-// 	// For each property, generate glsl code, output default value, (handle alignment)
-// 	if (!ast.properties_.size())
-// 	{
-// 		uint32_t zeroSize = 0;
-// 		out_defaults.AppendMemory(&zeroSize, sizeof(uint32_t));
-// 		return;
-// 	}
-//
-// 	// Add the local constants into the code.
-// 	out_buffer.AppendFormat("\n\t\tlayout (std140, binding=7) uniform LocalConstants {\n\n");
-//
-// 	// For GPU the struct must be 16 bytes aligned. Track alignment
-// 	uint32_t gpu_struct_alignment = 0;
-//
-// 	// In the defaults, write the type, size in '4 bytes' blocks, then data.
-// 	ResourceType resource_type = ResourceType::kConstants;
-// 	out_defaults.AppendMemory(&resource_type, sizeof(ResourceType));
-//
-// 	// Reserve space for later writing the correct value.
-// 	char* buffer_size_memory = out_defaults.Allocate(sizeof(uint32_t));
-//
-// 	for (size_t i = 0; i < ast.properties_.size(); i++)
-// 	{
-// 		Property* property = ast.properties_[i];
-//
-// 		switch (property->type_)
-// 		{
-// 			case PropertyType::kFloat:
-// 			{
-// 				out_buffer.AppendFormat("\t\t\tfloat\t\t\t\t\t");
-// 				out_buffer.AppendIndirectString(property->name_);
-// 				out_buffer.AppendFormat(";\n");
-//
-// 				// Get default value and write it into default buffer
-// 				if (property->data_index_ != INVALID_PROPERTY_DATA_INDEX)
-// 				{
-// 					float value = 0.0f;
-// 					data_buffer.GetData(property->data_index_, value);
-// 					out_defaults.AppendMemory(&value, sizeof(float));
-// 				}
-// 				// Update offset
-// 				property->offset_in_bytes_ = gpu_struct_alignment * 4;
-//
-// 				++gpu_struct_alignment;
-// 				break;
-// 			}
-//
-// 			case PropertyType::kInt: { break; }
-//
-// 			case PropertyType::kRange: { break; }
-//
-// 			case PropertyType::kColor: { break; }
-//
-// 			case PropertyType::kVector: { break; }
-// 		}
-// 	}
-//
-// 	uint32_t tail_padding_size = 4 - (gpu_struct_alignment % 4);
-// 	out_buffer.AppendFormat("\t\t\tfloat\t\t\t\t\tpad_tail[%u];\n\n", tail_padding_size);
-// 	out_buffer.AppendFormat("\t\t} local_constants;\n\n");
-//
-// 	for (uint32_t v = 0; v < tail_padding_size; ++v)
-// 	{
-// 		float value = 0.0f;
-// 		out_defaults.AppendMemory(&value, sizeof(float));
-// 	}
-//
-// 	// Write the constant buffer size in bytes.
-// 	uint32_t constants_buffer_size = (gpu_struct_alignment + tail_padding_size) * sizeof(float);
-// 	memcpy(buffer_size_memory, &constants_buffer_size, sizeof(uint32_t));
-// }
+
+ShaderGenerator::ShaderGenerator(const ShaderEffect& shader_effect): shader_effect_(shader_effect) {}
+
+void ShaderGenerator::GenerateShaders(const std::string& path)
+{
+	const uint32_t pass_count = (uint32_t)shader_effect_.passes_.size();
+	for (uint32_t i = 0; i < pass_count; i++)
+	{
+		const Pass& pass = shader_effect_.passes_[i];
+		for (size_t s = 0; s < pass.shaders_.size(); ++s) { OutputShader(path, pass.shaders_[s],shader_effect_.code_chunks_); }
+	}
+}
+
+void ShaderGenerator::OutputShader(const std::string& path, const Shader& shader, const std::vector<CodeChunk>& code_chunks)
+{
+	if(static_cast<int>(code_chunks.size()) <= shader.code_chunk_ref_)
+		throw std::runtime_error("Code chunk index out of bounds.");
+	const CodeChunk& code_chunk = code_chunks[shader.code_chunk_ref_];
+
+	std::string file_name = path + code_chunk.name_ + "_" + ShaderType2Postfix(shader.type_) + ".glsl";
+	std::ofstream file(file_name);
+	file << "#version 330 core\n";
+	file << "#define " << ShaderType2String(shader.type_) << "\n";
+	file << code_chunk.code_;
+	file.close();
+}
+
+void GeneatePropertiesShaderCode(ShaderEffect& shader_effect, StringBuffer& out_buffer)
+{
+	// For each property, generate glsl code, output default value, (handle alignment)
+	if (!shader_effect.properties_.size())
+	{
+		uint32_t zeroSize = 0;
+		// out_defaults.AppendMemory(&zeroSize, sizeof(uint32_t));
+		return;
+	}
+
+	// Add the local constants into the code.
+	out_buffer.AppendFormat("\n\t\tlayout (std140, binding=7) uniform LocalConstants {\n\n");
+
+	// For GPU the struct must be 16 bytes aligned. Track alignment
+	uint32_t gpu_struct_alignment = 0;
+
+	// In the defaults, write the type, size in '4 bytes' blocks, then data.
+	graphics::ResourceType resource_type = graphics::ResourceType::kConstants;
+	// out_defaults.AppendMemory(&resource_type, sizeof(graphics::ResourceType));
+
+	// Reserve space for later writing the correct value.
+	// char* buffer_size_memory = out_defaults.Allocate(sizeof(uint32_t));
+
+	for (size_t i = 0; i < shader_effect.properties_.size(); i++)
+	{
+		auto property = shader_effect.properties_[i];
+
+		switch (property->type_)
+		{
+			case graphics::PropertyType::kFloat:
+			{
+				out_buffer.AppendFormat("\t\t\tfloat\t\t\t\t\t");
+				out_buffer.AppendString(property->name_);
+				out_buffer.AppendFormat(";\n");
+
+				// Get default value and write it into default buffer
+				// if (property->data_index_ != INVALID_PROPERTY_DATA_INDEX)
+				// {
+				// 	float value = 0.0f;
+				// 	data_buffer.GetData(property->data_index_, value);
+				// 	// out_defaults.AppendMemory(&value, sizeof(float));
+				// }
+				// Update offset
+				// property->offset_in_bytes_ = gpu_struct_alignment * 4;
+
+				++gpu_struct_alignment;
+				break;
+			}
+
+			case graphics::PropertyType::kInt: { break; }
+
+			case graphics::PropertyType::kRange: { break; }
+
+			case graphics::PropertyType::kColor: { break; }
+
+			case graphics::PropertyType::kVector: { break; }
+		}
+	}
+
+	uint32_t tail_padding_size = 4 - (gpu_struct_alignment % 4);
+	out_buffer.AppendFormat("\t\t\tfloat\t\t\t\t\tpad_tail[%u];\n\n", tail_padding_size);
+	out_buffer.AppendFormat("\t\t} local_constants;\n\n");
+
+	for (uint32_t v = 0; v < tail_padding_size; ++v)
+	{
+		float value = 0.0f;
+		// out_defaults.AppendMemory(&value, sizeof(float));
+	}
+
+	// Write the constant buffer size in bytes.
+	// uint32_t constants_buffer_size = (gpu_struct_alignment + tail_padding_size) * sizeof(float);
+	// memcpy(buffer_size_memory, &constants_buffer_size, sizeof(uint32_t));
+}
 
 // void WriteEffectFile(AST& ast, const std::string& file_path)
 // {
@@ -1347,21 +1351,21 @@ void CompileHFX(const std::string& file_path)
 		BinarySerializer serializer(SerializerAction::kWrite, "shader_effect.bin");
 		serializer << shader_effect;
 	}
+	ShaderEffect shader_effect2;
 	{
-		ShaderEffect shader_effect2;
 		BinarySerializer serializer(SerializerAction::kRead, "shader_effect.bin");
 		serializer << shader_effect2;
 	}
 
-	// ShaderGenerator shader_generator(ast);
-	// shader_generator.GenerateShaders(ST::PathManager::GetHFXDir());
+	ShaderGenerator shader_generator(shader_effect2);
+	shader_generator.GenerateShaders(ST::PathManager::GetHFXDir());
+
 	//
 	// // Calculate Output File Path
 	// std::string output_file_path = ""; //TODO
 	//
-	// StringBuffer out_defaults;
-	// StringBuffer out_buffer;
-	// GeneatePropertiesShaderCodeAndGetDefault(ast, data_buffer, out_defaults, out_buffer);
+	StringBuffer out_buffer;
+	GeneatePropertiesShaderCode(shader_effect2, out_buffer);
 	//
 	// DOWork(ast, ST::PathManager::GetHFXDir() + "shader_effect.bin", SerializerAction::kWrite);
 	// AST ast2;

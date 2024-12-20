@@ -50,6 +50,8 @@ public:
 	void AppendFormat(const char* format, ...);
 
 	void AppendIndirectString(const IndirectString& text);
+	
+	void AppendString(const std::string& text);
 
 	void AppendMemory(void* memory, uint32_t size);
 
@@ -459,18 +461,18 @@ public:
 	int FindCodeChunk(const std::string& name);
 };
 
-// class ShaderGenerator
-// {
-// public:
-// 	ShaderGenerator(const ShaderEffect& shader_effect);
-//
-// 	void GenerateShaders(const std::string& path);
-//
-// 	void OutputShaderStage(const std::string& path, const Pass::Stage& stage);
-//
-// protected:
-// 	const ShaderEffect& shader_effect_;
-// };
+class ShaderGenerator
+{
+public:
+	ShaderGenerator(const ShaderEffect& shader_effect);
+
+	void GenerateShaders(const std::string& path);
+
+	void OutputShader(const std::string& path, const Shader& shader, const std::vector<CodeChunk>& code_chunks);
+
+protected:
+	const ShaderEffect& shader_effect_;
+};
 
 void CompileHFX(const std::string& file_path);
 
