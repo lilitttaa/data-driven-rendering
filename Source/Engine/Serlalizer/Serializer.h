@@ -5,9 +5,6 @@
 
 #include "HFX/HFX.h"
 
-namespace HFX
-{}
-
 enum class SerializerAction
 {
 	kWrite,
@@ -26,9 +23,9 @@ public:
 
 	template <>
 	BinarySerializer& operator<<(std::string& value);
-
-	template <>
-	BinarySerializer& operator<<(HFX::IndirectString& value);
+	
+	template <typename U>
+	BinarySerializer& operator<<(std::vector<U>& value);
 
 	SerializerAction GetAction() const { return action_; }
 
@@ -65,9 +62,25 @@ BinarySerializer& BinarySerializer::operator<<(T& value)
 		}
 		else { stream_.read(reinterpret_cast<char*>(&value), sizeof(T)); }
 	}
+	else { throw std::runtime_error("Type not supported by BinarySerializer"); }
+	return *this;
+}
+
+template <typename U>
+BinarySerializer& BinarySerializer::operator<<(std::vector<U>& value)
+{
+	if (action_ == SerializerAction::kWrite)
+	{
+		uint32_t size = static_cast<uint32_t>(value.size());
+		stream_.write(reinterpret_cast<char*>(&size), sizeof(uint32_t));
+		for (auto& element : value) { *this << element; }
+	}
 	else
 	{
-		throw std::runtime_error("Type not supported by BinarySerializer");
+		uint32_t size = 0;
+		stream_.read(reinterpret_cast<char*>(&size), sizeof(uint32_t));
+		value.resize(size);
+		for (auto& element : value) { *this << element; }
 	}
 	return *this;
 }
@@ -87,24 +100,6 @@ BinarySerializer& BinarySerializer::operator<<(std::string& value)
 		stream_.read(reinterpret_cast<char*>(&size), sizeof(uint32_t));
 		value.resize(size);
 		stream_.read(&value[0], size);
-	}
-	return *this;
-}
-
-template <>
-BinarySerializer& BinarySerializer::operator<<(HFX::IndirectString& value)
-{
-	if (action_ == SerializerAction::kWrite)
-	{
-		stream_.write(reinterpret_cast<char*>(&value.length_), sizeof(size_t));
-		stream_.write(value.text_, static_cast<size_t>(value.length_));
-	}
-	else
-	{
-		stream_.read(reinterpret_cast<char*>(&value.length_), sizeof(size_t));
-		delete[] value.text_;
-		value.text_ = new char[value.length_];
-		stream_.read(const_cast<char*>(value.text_), static_cast<size_t>(value.length_));
 	}
 	return *this;
 }

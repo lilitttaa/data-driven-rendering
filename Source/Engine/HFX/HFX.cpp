@@ -1,5 +1,4 @@
 #include <cstdint>
-#include <fstream>
 #include <iostream>
 #include <ostream>
 #include <vector>
@@ -11,30 +10,30 @@
 
 namespace HFX
 {
-std::string kShaderStageTable[] = {"VERTEX", "FRAGMENT", "GEOMETRY", "COMPUTE", "HULL", "DOMAIN"};
-std::string kShaderStagePostfixTable[] = {"vt", "fg", "gm", "cp", "hl", "dm"};
+std::string kShaderTypeTable[] = {"VERTEX", "FRAGMENT", "GEOMETRY", "COMPUTE", "HULL", "DOMAIN"};
+std::string kShaderTypePostfixTable[] = {"vt", "fg", "gm", "cp", "hl", "dm"};
 
-std::string ShaderStage2Postfix(ShaderStage stage) { return kShaderStagePostfixTable[static_cast<uint32_t>(stage)]; }
+std::string ShaderType2Postfix(graphics::ShaderType stage) { return kShaderTypePostfixTable[static_cast<uint32_t>(stage)]; }
 
-std::string ShaderStage2String(ShaderStage stage) { return kShaderStageTable[static_cast<uint32_t>(stage)]; }
+std::string ShaderType2String(graphics::ShaderType stage) { return kShaderTypeTable[static_cast<uint32_t>(stage)]; }
 
-std::ostream& operator<<(std::ostream& os, const ShaderStage& stage)
+std::ostream& operator<<(std::ostream& os, const graphics::ShaderType& type)
 {
-	switch (stage)
+	switch (type)
 	{
-		case ShaderStage::kVertex: { os << "Vertex"; }
+		case graphics::ShaderType::kVertex: { os << "Vertex"; }
 		break;
-		case ShaderStage::kFragment: { os << "Fragment"; }
+		case graphics::ShaderType::kFragment: { os << "Fragment"; }
 		break;
-		case ShaderStage::kGeometry: { os << "Geometry"; }
+		case graphics::ShaderType::kGeometry: { os << "Geometry"; }
 		break;
-		case ShaderStage::kCompute: { os << "Compute"; }
+		case graphics::ShaderType::kCompute: { os << "Compute"; }
 		break;
-		case ShaderStage::kHull: { os << "Hull"; }
+		case graphics::ShaderType::kHull: { os << "Hull"; }
 		break;
-		case ShaderStage::kDomain: { os << "Domain"; }
+		case graphics::ShaderType::kDomain: { os << "Domain"; }
 		break;
-		case ShaderStage::kCount: { os << "Count"; }
+		case graphics::ShaderType::kCount: { os << "Count"; }
 		break;
 	}
 	return os;
@@ -169,41 +168,64 @@ void DataBuffer::GetData(uint32_t entry_index, float& value) const
 	value = static_cast<float>(*value_data);
 }
 
+void DataBuffer::GetData(float& value) const { GetData(GetLastEntryIndex(), value); }
+
 uint32_t DataBuffer::GetLastEntryIndex() const { return current_entry_trail_index_ - 1; }
 
-void AST::Print()
+// void AST::Print()
+// {
+// 	std::cout << "Shader: " << name_ << std::endl;
+// 	for (const auto& code_fragment : code_fragments_)
+// 	{
+// 		std::cout << "CodeFragment: " << code_fragment.name_ << std::endl;
+// 		std::cout << "Code: " << code_fragment.code_ << std::endl;
+// 		std::cout << "Ifdef Depth: " << code_fragment.if_def_depth_ << std::endl;
+// 		std::cout << "Current Stage: " << static_cast<uint32_t>(code_fragment.current_stage_) << std::endl;
+// 		for (const auto& resource : code_fragment.resources_) { std::cout << "Resource: " << resource.name_ << std::endl; }
+// 		for (const auto& include : code_fragment.includes_) { std::cout << "Include: " << include << std::endl; }
+// 		for (const auto& include_flag : code_fragment.includes_flags_) { std::cout << "Include Flag: " << include_flag << std::endl; }
+// 		for (size_t i = 0; i < static_cast<uint32_t>(ShaderStage::kCount); i++)
+// 		{
+// 			std::cout << "Stage Ifdef Depth: " << code_fragment.stage_if_def_depth_[i] << std::endl;
+// 		}
+// 	}
+// 	for (const auto& pass : passes_)
+// 	{
+// 		std::cout << "Pass: " << pass.name_ << std::endl;
+// 		for (const auto& shader_stage : pass.shader_stages_)
+// 		{
+// 			std::cout << shader_stage.stage << "---" << shader_stage.code->name_ << std::endl;
+// 			std::cout << "shader_stage.code->code: " << shader_stage.code->code_ << std::endl;
+// 		}
+// 	}
+// 	for (const auto& property : properties_)
+// 	{
+// 		std::cout << "Property: " << property->name_ << std::endl;
+// 		std::cout << "UI Name: " << property->ui_name_ << std::endl;
+// 		std::cout << "Default Value: " << property->default_value_ << std::endl;
+// 		std::cout << "Type: " << property->type_ << std::endl;
+// 	}
+// }
+
+std::ostream& operator<<(std::ostream& os, const ShaderEffect& shader_effect)
 {
-	std::cout << "Shader: " << name_ << std::endl;
-	for (const auto& code_fragment : code_fragments_)
-	{
-		std::cout << "CodeFragment: " << code_fragment.name_ << std::endl;
-		std::cout << "Code: " << code_fragment.code_ << std::endl;
-		std::cout << "Ifdef Depth: " << code_fragment.if_def_depth_ << std::endl;
-		std::cout << "Current Stage: " << static_cast<uint32_t>(code_fragment.current_stage_) << std::endl;
-		for (const auto& resource : code_fragment.resources_) { std::cout << "Resource: " << resource.name_ << std::endl; }
-		for (const auto& include : code_fragment.includes_) { std::cout << "Include: " << include << std::endl; }
-		for (const auto& include_flag : code_fragment.includes_flags_) { std::cout << "Include Flag: " << include_flag << std::endl; }
-		for (size_t i = 0; i < static_cast<uint32_t>(ShaderStage::kCount); i++)
-		{
-			std::cout << "Stage Ifdef Depth: " << code_fragment.stage_if_def_depth_[i] << std::endl;
-		}
-	}
-	for (const auto& pass : passes_)
-	{
-		std::cout << "Pass: " << pass.name_ << std::endl;
-		for (const auto& shader_stage : pass.shader_stages_)
-		{
-			std::cout << shader_stage.stage << "---" << shader_stage.code->name_ << std::endl;
-			std::cout << "shader_stage.code->code: " << shader_stage.code->code_ << std::endl;
-		}
-	}
-	for (const auto& property : properties_)
-	{
-		std::cout << "Property: " << property->name_ << std::endl;
-		std::cout << "UI Name: " << property->ui_name_ << std::endl;
-		std::cout << "Default Value: " << property->default_value_ << std::endl;
-		std::cout << "Type: " << property->type_ << std::endl;
-	}
+	os << "Shader Effect: " << shader_effect.name_ << std::endl;
+	return os;
+}
+
+BinarySerializer& operator<<(BinarySerializer& serializer, ShaderEffect& shader_effect)
+{
+	serializer << shader_effect.name_;
+	serializer << shader_effect.passes_;
+	serializer << shader_effect.code_chunks_;
+	serializer << shader_effect.resource_lists_;
+	serializer << shader_effect.render_states_;
+	// uint32_t properties_size = 0;
+	// if (serializer.GetAction() == SerializerAction::kWrite) { properties_size = static_cast<uint32_t>(shader_effect.properties_.size()); }
+	// serializer << properties_size;
+	// if (serializer.GetAction() == SerializerAction::kRead) { shader_effect.properties_.resize(properties_size); }
+	// for (auto& property : shader_effect.properties_) { serializer << *property; }
+	return serializer;
 }
 
 Lexer::Lexer(const std::string& source, DataBuffer& in_data_buffer): position_(source.c_str()), line_(1), column_(0), has_error_(false),
@@ -447,7 +469,7 @@ void Lexer::ParseNumber()
 	data_buffer_.AddData(parsed_number);
 }
 
-void Parser::GenerateAST()
+void Parser::Parse()
 {
 	bool parsing = true;
 	while (parsing)
@@ -472,19 +494,20 @@ void Parser::GenerateAST()
 	}
 }
 
-void Parser::DeclarationShader()
+void Parser::DeclarationEffect()
 {
 	Token token;
 	if (!lexer.ExpectToken(token, TokenType::kToken_Identifier)) { return; }
 
-	ast_.name_ = token.text_;
+	// ast_.name_ = token.text_;
+	shader_effect_.name_ = token.text_.ToString();
 
 	if (!lexer.ExpectToken(token, TokenType::kToken_OpenBrace)) { return; }
 
 	while (!lexer.EqualToken(token, TokenType::kToken_CloseBrace)) { Identifier(token); }
 }
 
-bool Parser::TryParseIfDefined(const Token& token, CodeFragment& code_fragment)
+bool Parser::TryParseIfDefined(const Token& token, CodeChunk& code_chunk)
 {
 	if (ExpectKeyword(token.text_, "if"))
 	{
@@ -494,22 +517,22 @@ bool Parser::TryParseIfDefined(const Token& token, CodeFragment& code_fragment)
 		if (ExpectKeyword(new_token.text_, "defined"))
 		{
 			lexer.NextToken(new_token);
-			++code_fragment.if_def_depth_;
+			// ++code_chunk.if_def_depth_;
 
 			if (ExpectKeyword(new_token.text_, "VERTEX"))
 			{
-				code_fragment.stage_if_def_depth_[static_cast<uint32_t>(ShaderStage::kVertex)] = code_fragment.if_def_depth_;
-				code_fragment.current_stage_ = ShaderStage::kVertex;
+				// code_chunk.stage_if_def_depth_[static_cast<uint32_t>(ShaderStage::kVertex)] = code_chunk.if_def_depth_;
+				// code_chunk.current_stage_ = ShaderStage::kVertex;
 			}
 			else if (ExpectKeyword(new_token.text_, "FRAGMENT"))
 			{
-				code_fragment.stage_if_def_depth_[static_cast<uint32_t>(ShaderStage::kFragment)] = code_fragment.if_def_depth_;
-				code_fragment.current_stage_ = ShaderStage::kFragment;
+				// code_chunk.stage_if_def_depth_[static_cast<uint32_t>(ShaderStage::kFragment)] = code_chunk.if_def_depth_;
+				// code_chunk.current_stage_ = ShaderStage::kFragment;
 			}
 			else if (ExpectKeyword(new_token.text_, "COMPUTE"))
 			{
-				code_fragment.stage_if_def_depth_[static_cast<uint32_t>(ShaderStage::kCompute)] = code_fragment.if_def_depth_;
-				code_fragment.current_stage_ = ShaderStage::kCompute;
+				// code_chunk.stage_if_def_depth_[static_cast<uint32_t>(ShaderStage::kCompute)] = code_chunk.if_def_depth_;
+				// code_chunk.current_stage_ = ShaderStage::kCompute;
 			}
 		}
 
@@ -518,7 +541,7 @@ bool Parser::TryParseIfDefined(const Token& token, CodeFragment& code_fragment)
 	return false;
 }
 
-bool Parser::TryParsePragma(const Token& token, CodeFragment& code_fragment)
+bool Parser::TryParsePragma(const Token& token, CodeChunk& code_chunk)
 {
 	if (ExpectKeyword(token.text_, "pragma"))
 	{
@@ -529,16 +552,16 @@ bool Parser::TryParsePragma(const Token& token, CodeFragment& code_fragment)
 		{
 			lexer.NextToken(new_token);
 
-			code_fragment.includes_.emplace_back(new_token.text_);
-			code_fragment.includes_flags_.emplace_back((uint32_t)code_fragment.current_stage_);
+			code_chunk.includes_.emplace_back(new_token.text_.ToString());
+			// code_chunk.includes_flags_.emplace_back((uint32_t)code_chunk.current_stage_);
 		}
 		else if (ExpectKeyword(new_token.text_, "include_hfx"))
 		{
 			lexer.NextToken(new_token);
 
-			code_fragment.includes_.emplace_back(new_token.text_);
-			uint32_t flag = (uint32_t)code_fragment.current_stage_ | 0x10; // 0x10 = local hfx.
-			code_fragment.includes_flags_.emplace_back(flag);
+			code_chunk.includes_.emplace_back(new_token.text_.ToString());
+			// uint32_t flag = (uint32_t)code_chunk.current_stage_ | 0x10; // 0x10 = local hfx.
+			// code_chunk.includes_flags_.emplace_back(flag);
 		}
 
 		return true;
@@ -546,34 +569,34 @@ bool Parser::TryParsePragma(const Token& token, CodeFragment& code_fragment)
 	return false;
 }
 
-bool Parser::TryParseEndIf(const Token& token, CodeFragment& code_fragment)
+bool Parser::TryParseEndIf(const Token& token, CodeChunk& code_chunk)
 {
 	if (ExpectKeyword(token.text_, "endif"))
 	{
-		if (code_fragment.stage_if_def_depth_[static_cast<uint32_t>(ShaderStage::kVertex)] == code_fragment.if_def_depth_)
-		{
-			code_fragment.stage_if_def_depth_[static_cast<uint32_t>(ShaderStage::kVertex)] = 0xffffffff;
-			code_fragment.current_stage_ = ShaderStage::kCount;
-		}
-		else if (code_fragment.stage_if_def_depth_[static_cast<uint32_t>(ShaderStage::kFragment)] == code_fragment.if_def_depth_)
-		{
-			code_fragment.stage_if_def_depth_[static_cast<uint32_t>(ShaderStage::kFragment)] = 0xffffffff;
-			code_fragment.current_stage_ = ShaderStage::kCount;
-		}
-		else if (code_fragment.stage_if_def_depth_[static_cast<uint32_t>(ShaderStage::kCompute)] == code_fragment.if_def_depth_)
-		{
-			code_fragment.stage_if_def_depth_[static_cast<uint32_t>(ShaderStage::kCompute)] = 0xffffffff;
-			code_fragment.current_stage_ = ShaderStage::kCount;
-		}
-
-		--code_fragment.if_def_depth_;
+		// if (code_chunk.stage_if_def_depth_[static_cast<uint32_t>(ShaderStage::kVertex)] == code_chunk.if_def_depth_)
+		// {
+		// 	code_chunk.stage_if_def_depth_[static_cast<uint32_t>(ShaderStage::kVertex)] = 0xffffffff;
+		// 	code_chunk.current_stage_ = ShaderStage::kCount;
+		// }
+		// else if (code_chunk.stage_if_def_depth_[static_cast<uint32_t>(ShaderStage::kFragment)] == code_chunk.if_def_depth_)
+		// {
+		// 	code_chunk.stage_if_def_depth_[static_cast<uint32_t>(ShaderStage::kFragment)] = 0xffffffff;
+		// 	code_chunk.current_stage_ = ShaderStage::kCount;
+		// }
+		// else if (code_chunk.stage_if_def_depth_[static_cast<uint32_t>(ShaderStage::kCompute)] == code_chunk.if_def_depth_)
+		// {
+		// 	code_chunk.stage_if_def_depth_[static_cast<uint32_t>(ShaderStage::kCompute)] = 0xffffffff;
+		// 	code_chunk.current_stage_ = ShaderStage::kCount;
+		// }
+		//
+		// --code_chunk.if_def_depth_;
 
 		return true;
 	}
 	return false;
 }
 
-void Parser::DirectiveIdentifier(const Token& token, CodeFragment& code_fragment)
+void Parser::DirectiveIdentifier(const Token& token, CodeChunk& code_chunk)
 {
 	for (uint32_t i = 0; i < token.text_.length_; ++i)
 	{
@@ -583,21 +606,21 @@ void Parser::DirectiveIdentifier(const Token& token, CodeFragment& code_fragment
 		{
 			case 'i':
 			{
-				if (TryParseIfDefined(token, code_fragment))
+				if (TryParseIfDefined(token, code_chunk))
 					return;
 				break;
 			}
 
 			case 'p':
 			{
-				if (TryParsePragma(token, code_fragment))
+				if (TryParsePragma(token, code_chunk))
 					return;
 				break;
 			}
 
 			case 'e':
 			{
-				if (TryParseEndIf(token, code_fragment))
+				if (TryParseEndIf(token, code_chunk))
 					return;
 				break;
 			}
@@ -605,7 +628,7 @@ void Parser::DirectiveIdentifier(const Token& token, CodeFragment& code_fragment
 	}
 }
 
-void Parser::UniformIdentifier(const Token& token, CodeFragment& code_fragment)
+void Parser::UniformIdentifier(const Token& token, CodeChunk& code_chunk)
 {
 	for (uint32_t i = 0; i < token.text_.length_; ++i)
 	{
@@ -621,8 +644,8 @@ void Parser::UniformIdentifier(const Token& token, CodeFragment& code_fragment)
 					Token name_token;
 					lexer.NextToken(name_token);
 
-					CodeFragment::Resource resource = {ResourceType::kTextureRW, name_token.text_};
-					code_fragment.resources_.emplace_back(resource);
+					Resource resource = {graphics::ResourceType::kTextureRW, name_token.text_.ToString()};
+					code_chunk.resources_.emplace_back(resource);
 				}
 				break;
 			}
@@ -635,8 +658,8 @@ void Parser::UniformIdentifier(const Token& token, CodeFragment& code_fragment)
 					Token name_token;
 					lexer.NextToken(name_token);
 
-					CodeFragment::Resource resource = {ResourceType::kTexture, name_token.text_};
-					code_fragment.resources_.emplace_back(resource);
+					Resource resource = {graphics::ResourceType::kTexture, name_token.text_.ToString()};
+					code_chunk.resources_.emplace_back(resource);
 				}
 				break;
 			}
@@ -644,7 +667,7 @@ void Parser::UniformIdentifier(const Token& token, CodeFragment& code_fragment)
 	}
 }
 
-void Parser::ParseGlslContent(Token& token, CodeFragment code_fragment)
+void Parser::ParseGlslContent(Token& token, CodeChunk& code_chunk)
 {
 	uint32_t open_braces = 1;
 
@@ -662,7 +685,7 @@ void Parser::ParseGlslContent(Token& token, CodeFragment code_fragment)
 			// Get next token and check which directive is
 			lexer.NextToken(token);
 
-			DirectiveIdentifier(token, code_fragment);
+			DirectiveIdentifier(token, code_chunk);
 		}
 		else if (token.type_ == TokenType::kToken_Identifier)
 		{
@@ -671,7 +694,7 @@ void Parser::ParseGlslContent(Token& token, CodeFragment code_fragment)
 			{
 				lexer.NextToken(token);
 
-				UniformIdentifier(token, code_fragment);
+				UniformIdentifier(token, code_chunk);
 			}
 		}
 
@@ -685,30 +708,37 @@ void Parser::DeclarationGlsl()
 {
 	Token token;
 	if (!lexer.ExpectToken(token, TokenType::kToken_Identifier)) { return; }
-	CodeFragment code_fragment = {};
-	code_fragment.name_ = token.text_;
+	// CodeFragment code_fragment = {};
+	CodeChunk code_chunk = {};
+	code_chunk.name_ = token.text_.ToString();
+	// code_fragment.name_ = token.text_;
 
-	for (size_t i = 0; i < static_cast<uint32_t>(ShaderStage::kCount); i++) { code_fragment.stage_if_def_depth_[i] = 0xffffffff; }
+	// for (size_t i = 0; i < static_cast<uint32_t>(graphics::ShaderType::kCount); i++) { code_fragment.stage_if_def_depth_[i] = 0xffffffff; }
 
 	if (!lexer.ExpectToken(token, TokenType::kToken_OpenBrace)) { return; }
 
 	lexer.NextToken(token);
-	code_fragment.code_.text_ = token.text_.text_;
+	IndirectString code = token.text_;
+	// code_fragment.code_.text_ = token.text_.text_;
 
-	ParseGlslContent(token, code_fragment);
-	code_fragment.code_.length_ = token.text_.text_ - code_fragment.code_.text_;
+	ParseGlslContent(token, code_chunk);
+	// code_fragment.code_.length_ = token.text_.text_ - code_fragment.code_.text_;
+	code.length_ = token.text_.text_ - code.text_;
+	code_chunk.code_ = code.ToString();
 
-	ast_.code_fragments_.emplace_back(code_fragment);
+	shader_effect_.code_chunks_.emplace_back(code_chunk);
+	// ast_.code_fragments_.emplace_back(code_fragment);
 }
 
-void Parser::DeclarationShaderStage(Pass::Stage& out_stage)
+void Parser::DeclarationShader(Shader& out_shader)
 {
 	Token token;
 	if (!lexer.ExpectToken(token, TokenType::kToken_Equals)) { return; }
 
 	if (!lexer.ExpectToken(token, TokenType::kToken_Identifier)) { return; }
 
-	out_stage.code = FindCodeFragment(token.text_);
+	out_shader.code_chunk_ref_ = FindCodeChunk(token.text_.ToString());
+	// shader.code = FindCodeFragment(token.text_);
 }
 
 void Parser::PassIdentifier(const Token& token, Pass& pass)
@@ -718,16 +748,18 @@ void Parser::PassIdentifier(const Token& token, Pass& pass)
 	{
 		char c = *(token.text_.text_ + i);
 
+		Shader shader = {};
 		switch (c)
 		{
 			case 'c':
 			{
 				if (ExpectKeyword(token.text_, "compute"))
 				{
-					Pass::Stage stage = {nullptr, ShaderStage::kCompute};
-					DeclarationShaderStage(stage);
-					pass.shader_stages_.emplace_back(stage);
-					return;
+					shader.type_ = graphics::ShaderType::kCompute;
+					// Pass::Stage stage = {nullptr, ShaderStage::kCompute};
+					DeclarationShader(shader);
+					// pass.shader_stages_.emplace_back(stage);
+					// return;
 				}
 				break;
 			}
@@ -736,10 +768,11 @@ void Parser::PassIdentifier(const Token& token, Pass& pass)
 			{
 				if (ExpectKeyword(token.text_, "vertex"))
 				{
-					Pass::Stage stage = {nullptr, ShaderStage::kVertex};
-					DeclarationShaderStage(stage);
-					pass.shader_stages_.emplace_back(stage);
-					return;
+					shader.type_ = graphics::ShaderType::kVertex;
+					// Pass::Stage stage = {nullptr, ShaderStage::kVertex};
+					DeclarationShader(shader);
+					// pass.shader_stages_.emplace_back(stage);
+					// return;
 				}
 				break;
 			}
@@ -748,14 +781,15 @@ void Parser::PassIdentifier(const Token& token, Pass& pass)
 			{
 				if (ExpectKeyword(token.text_, "fragment"))
 				{
-					Pass::Stage stage = {nullptr, ShaderStage::kFragment};
-					DeclarationShaderStage(stage);
-					pass.shader_stages_.emplace_back(stage);
-					return;
+					shader.type_ = graphics::ShaderType::kFragment;
+					DeclarationShader(shader);
+					// pass.shader_stages_.emplace_back(stage);
 				}
 				break;
 			}
 		}
+		pass.shaders_.emplace_back(shader);
+		return;
 	}
 }
 
@@ -766,11 +800,13 @@ void Parser::DeclarationPass()
 
 	Pass pass = {};
 	// Cache name string
-	pass.name_ = token.text_;
+	// pass.name_ = token.text_;
+	pass.name_ = token.text_.ToString();
 
 	if (!lexer.ExpectToken(token, TokenType::kToken_OpenBrace)) { return; }
 	while (!lexer.EqualToken(token, TokenType::kToken_CloseBrace)) { PassIdentifier(token, pass); }
-	ast_.passes_.emplace_back(pass);
+	shader_effect_.passes_.emplace_back(pass);
+	// ast_.passes_.emplace_back(pass);
 }
 
 void Parser::DeclarationProperties()
@@ -813,7 +849,7 @@ bool Parser::NumberAndIdentifier(Token& token)
 	return true;
 }
 
-void Parser::ParsePropertyDefaultValue(Property* property, Token token)
+void Parser::ParsePropertyDefaultValue(std::shared_ptr<Property> property, Token token)
 {
 	Lexer cached_lexer = CacheLexer(lexer);
 
@@ -823,10 +859,19 @@ void Parser::ParsePropertyDefaultValue(Property* property, Token token)
 	{
 		lexer.NextToken(token);
 
-		if (token.type_ == TokenType::kToken_Number)
+		if (token.type_ == TokenType::kToken_Number && property->type_ == graphics::PropertyType::kFloat)
 		{
 			// Cache the data buffer entry index into the property for later retrieval.
-			property->data_index_ = data_buffer.GetLastEntryIndex();
+			float default_value = 0.0f;
+			data_buffer.GetData(default_value);
+			static_cast<FloatProperty*>(property.get())->default_value_ = default_value;
+		}
+		if (token.type_ == TokenType::kToken_Number && property->type_ == graphics::PropertyType::kInt)
+		{
+			// Cache the data buffer entry index into the property for later retrieval.
+			float default_value = 0.0f;
+			data_buffer.GetData(default_value);
+			static_cast<IntProperty*>(property.get())->default_value_ = static_cast<int>(default_value);
 		}
 		else if (token.type_ == TokenType::kToken_OpenParen)
 		{
@@ -836,36 +881,56 @@ void Parser::ParsePropertyDefaultValue(Property* property, Token token)
 		else if (token.type_ == TokenType::kToken_String)
 		{
 			// For Texture.
-			property->default_value_ = token.text_;
+			// property->default_value_ = token.text_;
 		}
 		else { throw std::runtime_error("Invalid default value for property."); }
 	}
 	else { lexer = cached_lexer; }
 }
 
+class PropertyFactory
+{
+public:
+	static std::shared_ptr<Property> Create(graphics::PropertyType type)
+	{
+		switch (type)
+		{
+			case graphics::PropertyType::kInt: return std::make_shared<IntProperty>();
+			case graphics::PropertyType::kFloat: return std::make_shared<FloatProperty>();
+			case graphics::PropertyType::kRange: return std::make_shared<RangeProperty>();
+			default: throw std::runtime_error("Invalid property type.");
+		}
+	}
+};
+
 void Parser::DeclarationProperty(const IndirectString& name)
 {
-	Property* property = new Property();
-	property->name_ = name;
+	std::string property_name = name.ToString();
 
 	Token token;
 	if (!lexer.ExpectToken(token, TokenType::kToken_OpenParen)) { return; }
 	if (!lexer.ExpectToken(token, TokenType::kToken_String)) { return; }
-	property->ui_name_ = token.text_;
-	if (!lexer.ExpectToken(token, TokenType::kToken_Comma)) { return; }
+	std::string ui_name = token.text_.ToString();
 
+	if (!lexer.ExpectToken(token, TokenType::kToken_Comma)) { return; }
 	// Handle property type like '2D', 'Float'
 	if (!NumberAndIdentifier(token)) { return; }
-	property->type_ = PropertyTypeIdentifier(token);
+	graphics::PropertyType type = PropertyTypeIdentifier(token);
+
+	std::shared_ptr<Property> property = PropertyFactory::Create(type);
+	property->name_ = property_name;
+	property->ui_name_ = ui_name;
+	property->type_ = type;
 
 	lexer.NextToken(token);
 	if (!lexer.CheckToken(token, TokenType::kToken_CloseParen)) { return; }
 	ParsePropertyDefaultValue(property, token);
 
-	ast_.properties_.push_back(property);
+	shader_effect_.properties_.push_back(property);
+	// ast_.properties_.push_back(property);
 }
 
-PropertyType Parser::PropertyTypeIdentifier(const Token& token)
+graphics::PropertyType Parser::PropertyTypeIdentifier(const Token& token)
 {
 	for (uint32_t i = 0; i < token.text_.length_; ++i)
 	{
@@ -874,55 +939,55 @@ PropertyType Parser::PropertyTypeIdentifier(const Token& token)
 		{
 			case '1':
 			{
-				if (ExpectKeyword(token.text_, "1D")) { return PropertyType::kTexture1D; }
+				if (ExpectKeyword(token.text_, "1D")) { return graphics::PropertyType::kTexture1D; }
 				break;
 			}
 			case '2':
 			{
-				if (ExpectKeyword(token.text_, "2D")) { return PropertyType::kTexture2D; }
+				if (ExpectKeyword(token.text_, "2D")) { return graphics::PropertyType::kTexture2D; }
 				break;
 			}
 			case '3':
 			{
-				if (ExpectKeyword(token.text_, "3D")) { return PropertyType::kTexture3D; }
+				if (ExpectKeyword(token.text_, "3D")) { return graphics::PropertyType::kTexture3D; }
 				break;
 			}
 			case 'V':
 			{
-				if (ExpectKeyword(token.text_, "Volume")) { return PropertyType::kTextureVolume; }
+				if (ExpectKeyword(token.text_, "Volume")) { return graphics::PropertyType::kTextureVolume; }
 				else
-					if (ExpectKeyword(token.text_, "Vector")) { return PropertyType::kVector; }
+					if (ExpectKeyword(token.text_, "Vector")) { return graphics::PropertyType::kVector; }
 				break;
 			}
 			case 'I':
 			{
-				if (ExpectKeyword(token.text_, "Int")) { return PropertyType::kInt; }
+				if (ExpectKeyword(token.text_, "Int")) { return graphics::PropertyType::kInt; }
 				break;
 			}
 			case 'R':
 			{
-				if (ExpectKeyword(token.text_, "Range")) { return PropertyType::kRange; }
+				if (ExpectKeyword(token.text_, "Range")) { return graphics::PropertyType::kRange; }
 				break;
 			}
 			case 'F':
 			{
-				if (ExpectKeyword(token.text_, "Float")) { return PropertyType::kFloat; }
+				if (ExpectKeyword(token.text_, "Float")) { return graphics::PropertyType::kFloat; }
 				break;
 			}
 			case 'C':
 			{
-				if (ExpectKeyword(token.text_, "Color")) { return PropertyType::kColor; }
+				if (ExpectKeyword(token.text_, "Color")) { return graphics::PropertyType::kColor; }
 				break;
 			}
 			default:
 			{
-				return PropertyType::kUnknown;
+				return graphics::PropertyType::kUnknown;
 				break;
 			}
 		}
 	}
 
-	return PropertyType::kUnknown;
+	return graphics::PropertyType::kUnknown;
 }
 
 Lexer Parser::CacheLexer(const Lexer& lexer) { return Lexer(lexer); }
@@ -933,11 +998,11 @@ void Parser::Identifier(const Token& token)
 	{
 		switch (token.text_.text_[i])
 		{
-			case 's':
+			case 'e':
 			{
-				if (ExpectKeyword(token.text_, "shader"))
+				if (ExpectKeyword(token.text_, "effect"))
 				{
-					DeclarationShader();
+					DeclarationEffect();
 					return;
 				}
 
@@ -972,116 +1037,117 @@ void Parser::Identifier(const Token& token)
 	}
 }
 
-CodeFragment* Parser::FindCodeFragment(const IndirectString& name)
+int Parser::FindCodeChunk(const std::string& name)
 {
-	for (uint32_t i = 0; i < ast_.code_fragments_.size(); ++i)
+	for (uint32_t i = 0; i < shader_effect_.code_chunks_.size(); ++i)
 	{
-		CodeFragment* type = &ast_.code_fragments_[i];
-		if (IndirectString::Equals(name, type->name_)) { return type; }
+		CodeChunk* chunk = &shader_effect_.code_chunks_[i];
+		if (name == chunk->name_) { return static_cast<int>(i); }
 	}
-	return nullptr;
+	return -1;
 }
 
-ShaderGenerator::ShaderGenerator(const AST& ast): ast(ast) {}
-
-void ShaderGenerator::GenerateShaders(const std::string& path)
-{
-	const uint32_t pass_count = (uint32_t)ast.passes_.size();
-	for (uint32_t i = 0; i < pass_count; i++)
-	{
-		const Pass& pass = ast.passes_[i];
-		for (size_t s = 0; s < pass.shader_stages_.size(); ++s) { OutputShaderStage(path, pass.shader_stages_[s]); }
-	}
-}
-
-void ShaderGenerator::OutputShaderStage(const std::string& path, const Pass::Stage& stage)
-{
-	const CodeFragment* code_fragment = stage.code;
-	if (code_fragment == nullptr)
-		return;
-
-	std::string fileName = path + code_fragment->name_.ToString() + "_" + ShaderStage2Postfix(stage.stage) + ".glsl";
-	std::ofstream file(fileName);
-	std::string code = code_fragment->code_.ToString();
-	file << "#version 330 core\n";
-	file << "#define " << ShaderStage2String(stage.stage) << "\n";
-	file << code;
-	file.close();
-}
-
-void GeneatePropertiesShaderCodeAndGetDefault(AST& ast, const DataBuffer& data_buffer, StringBuffer& out_defaults, StringBuffer& out_buffer)
-{
-	// For each property, generate glsl code, output default value, (handle alignment)
-	if (!ast.properties_.size())
-	{
-		uint32_t zeroSize = 0;
-		out_defaults.AppendMemory(&zeroSize, sizeof(uint32_t));
-		return;
-	}
-
-	// Add the local constants into the code.
-	out_buffer.AppendFormat("\n\t\tlayout (std140, binding=7) uniform LocalConstants {\n\n");
-
-	// For GPU the struct must be 16 bytes aligned. Track alignment
-	uint32_t gpu_struct_alignment = 0;
-
-	// In the defaults, write the type, size in '4 bytes' blocks, then data.
-	ResourceType resource_type = ResourceType::kConstants;
-	out_defaults.AppendMemory(&resource_type, sizeof(ResourceType));
-
-	// Reserve space for later writing the correct value.
-	char* buffer_size_memory = out_defaults.Allocate(sizeof(uint32_t));
-
-	for (size_t i = 0; i < ast.properties_.size(); i++)
-	{
-		Property* property = ast.properties_[i];
-
-		switch (property->type_)
-		{
-			case PropertyType::kFloat:
-			{
-				out_buffer.AppendFormat("\t\t\tfloat\t\t\t\t\t");
-				out_buffer.AppendIndirectString(property->name_);
-				out_buffer.AppendFormat(";\n");
-
-				// Get default value and write it into default buffer
-				if (property->data_index_ != INVALID_PROPERTY_DATA_INDEX)
-				{
-					float value = 0.0f;
-					data_buffer.GetData(property->data_index_, value);
-					out_defaults.AppendMemory(&value, sizeof(float));
-				}
-				// Update offset
-				property->offset_in_bytes_ = gpu_struct_alignment * 4;
-
-				++gpu_struct_alignment;
-				break;
-			}
-
-			case PropertyType::kInt: { break; }
-
-			case PropertyType::kRange: { break; }
-
-			case PropertyType::kColor: { break; }
-
-			case PropertyType::kVector: { break; }
-		}
-	}
-
-	uint32_t tail_padding_size = 4 - (gpu_struct_alignment % 4);
-	out_buffer.AppendFormat("\t\t\tfloat\t\t\t\t\tpad_tail[%u];\n\n", tail_padding_size);
-	out_buffer.AppendFormat("\t\t} local_constants;\n\n");
-
-	for (uint32_t v = 0; v < tail_padding_size; ++v)
-	{
-		float value = 0.0f;
-		out_defaults.AppendMemory(&value, sizeof(float));
-	}
-
-	// Write the constant buffer size in bytes.
-	uint32_t constants_buffer_size = (gpu_struct_alignment + tail_padding_size) * sizeof(float);
-	memcpy(buffer_size_memory, &constants_buffer_size, sizeof(uint32_t));
-}
+//
+// ShaderGenerator::ShaderGenerator(const AST& ast): ast(ast) {}
+//
+// void ShaderGenerator::GenerateShaders(const std::string& path)
+// {
+// 	const uint32_t pass_count = (uint32_t)ast.passes_.size();
+// 	for (uint32_t i = 0; i < pass_count; i++)
+// 	{
+// 		const Pass& pass = ast.passes_[i];
+// 		for (size_t s = 0; s < pass.shader_stages_.size(); ++s) { OutputShaderStage(path, pass.shader_stages_[s]); }
+// 	}
+// }
+//
+// void ShaderGenerator::OutputShaderStage(const std::string& path, const Pass::Stage& stage)
+// {
+// 	const CodeFragment* code_fragment = stage.code;
+// 	if (code_fragment == nullptr)
+// 		return;
+//
+// 	std::string fileName = path + code_fragment->name_.ToString() + "_" + ShaderType2Postfix(stage.stage) + ".glsl";
+// 	std::ofstream file(fileName);
+// 	std::string code = code_fragment->code_.ToString();
+// 	file << "#version 330 core\n";
+// 	file << "#define " << ShaderType2String(stage.stage) << "\n";
+// 	file << code;
+// 	file.close();
+// }
+//
+// void GeneatePropertiesShaderCodeAndGetDefault(AST& ast, const DataBuffer& data_buffer, StringBuffer& out_defaults, StringBuffer& out_buffer)
+// {
+// 	// For each property, generate glsl code, output default value, (handle alignment)
+// 	if (!ast.properties_.size())
+// 	{
+// 		uint32_t zeroSize = 0;
+// 		out_defaults.AppendMemory(&zeroSize, sizeof(uint32_t));
+// 		return;
+// 	}
+//
+// 	// Add the local constants into the code.
+// 	out_buffer.AppendFormat("\n\t\tlayout (std140, binding=7) uniform LocalConstants {\n\n");
+//
+// 	// For GPU the struct must be 16 bytes aligned. Track alignment
+// 	uint32_t gpu_struct_alignment = 0;
+//
+// 	// In the defaults, write the type, size in '4 bytes' blocks, then data.
+// 	ResourceType resource_type = ResourceType::kConstants;
+// 	out_defaults.AppendMemory(&resource_type, sizeof(ResourceType));
+//
+// 	// Reserve space for later writing the correct value.
+// 	char* buffer_size_memory = out_defaults.Allocate(sizeof(uint32_t));
+//
+// 	for (size_t i = 0; i < ast.properties_.size(); i++)
+// 	{
+// 		Property* property = ast.properties_[i];
+//
+// 		switch (property->type_)
+// 		{
+// 			case PropertyType::kFloat:
+// 			{
+// 				out_buffer.AppendFormat("\t\t\tfloat\t\t\t\t\t");
+// 				out_buffer.AppendIndirectString(property->name_);
+// 				out_buffer.AppendFormat(";\n");
+//
+// 				// Get default value and write it into default buffer
+// 				if (property->data_index_ != INVALID_PROPERTY_DATA_INDEX)
+// 				{
+// 					float value = 0.0f;
+// 					data_buffer.GetData(property->data_index_, value);
+// 					out_defaults.AppendMemory(&value, sizeof(float));
+// 				}
+// 				// Update offset
+// 				property->offset_in_bytes_ = gpu_struct_alignment * 4;
+//
+// 				++gpu_struct_alignment;
+// 				break;
+// 			}
+//
+// 			case PropertyType::kInt: { break; }
+//
+// 			case PropertyType::kRange: { break; }
+//
+// 			case PropertyType::kColor: { break; }
+//
+// 			case PropertyType::kVector: { break; }
+// 		}
+// 	}
+//
+// 	uint32_t tail_padding_size = 4 - (gpu_struct_alignment % 4);
+// 	out_buffer.AppendFormat("\t\t\tfloat\t\t\t\t\tpad_tail[%u];\n\n", tail_padding_size);
+// 	out_buffer.AppendFormat("\t\t} local_constants;\n\n");
+//
+// 	for (uint32_t v = 0; v < tail_padding_size; ++v)
+// 	{
+// 		float value = 0.0f;
+// 		out_defaults.AppendMemory(&value, sizeof(float));
+// 	}
+//
+// 	// Write the constant buffer size in bytes.
+// 	uint32_t constants_buffer_size = (gpu_struct_alignment + tail_padding_size) * sizeof(float);
+// 	memcpy(buffer_size_memory, &constants_buffer_size, sizeof(uint32_t));
+// }
 
 // void WriteEffectFile(AST& ast, const std::string& file_path)
 // {
@@ -1099,39 +1165,38 @@ void GeneatePropertiesShaderCodeAndGetDefault(AST& ast, const DataBuffer& data_b
 // 	}
 // }
 
-void DOWork(AST& ast, const std::string& binary_path, SerializerAction action)
-{
-	{
-		BinarySerializer serializer(action, binary_path);
-		uint32_t pass_count = 0;
-		if (serializer.GetAction() == SerializerAction::kWrite)
-		{
-			pass_count = (uint32_t)ast.passes_.size();
-			serializer << pass_count;
-		}
-		else { serializer << pass_count; }
-		ast.passes_.resize(pass_count);
-		for (uint32_t i = 0; i < pass_count; i++)
-		{
-			Pass& pass = ast.passes_[i];
-			uint32_t stage_count = 0;
-			if (serializer.GetAction() == SerializerAction::kWrite)
-			{
-				stage_count = (uint32_t)pass.shader_stages_.size();
-				serializer << stage_count;
-			}
-			else { serializer << stage_count; }
-			pass.shader_stages_.resize(stage_count);
-			for (size_t s = 0; s < stage_count; ++s)
-			{
-				Pass::Stage& stage = pass.shader_stages_[s];
-				serializer << stage.stage;
-				serializer << stage.code->name_;
-			}
-			
-		}
-	}
-}
+// void DOWork(AST& ast, const std::string& binary_path, SerializerAction action)
+// {
+// 	{
+// 		BinarySerializer serializer(action, binary_path);
+// 		uint32_t pass_count = 0;
+// 		if (serializer.GetAction() == SerializerAction::kWrite)
+// 		{
+// 			pass_count = (uint32_t)ast.passes_.size();
+// 			serializer << pass_count;
+// 		}
+// 		else { serializer << pass_count; }
+// 		ast.passes_.resize(pass_count);
+// 		for (uint32_t i = 0; i < pass_count; i++)
+// 		{
+// 			Pass& pass = ast.passes_[i];
+// 			uint32_t stage_count = 0;
+// 			if (serializer.GetAction() == SerializerAction::kWrite)
+// 			{
+// 				stage_count = (uint32_t)pass.shader_stages_.size();
+// 				serializer << stage_count;
+// 			}
+// 			else { serializer << stage_count; }
+// 			pass.shader_stages_.resize(stage_count);
+// 			for (size_t s = 0; s < stage_count; ++s)
+// 			{
+// 				Pass::Stage& stage = pass.shader_stages_[s];
+// 				serializer << stage.stage;
+// 				serializer << stage.code->name_;
+// 			}
+// 		}
+// 	}
+// }
 
 void CompileHFX(const std::string& file_path)
 {
@@ -1139,22 +1204,33 @@ void CompileHFX(const std::string& file_path)
 	DataBuffer data_buffer(256, 2048);
 	Lexer lexer(content, data_buffer);
 	Parser parser(lexer, data_buffer);
-	parser.GenerateAST();
-	AST& ast = parser.GetAST();
-	ast.Print();
+	parser.Parse();
+	ShaderEffect& shader_effect = parser.GetShaderEffect();
+	std::cout << shader_effect << std::endl;
 	data_buffer.Print();
-	ShaderGenerator shader_generator(ast);
-	shader_generator.GenerateShaders(ST::PathManager::GetHFXDir());
 
-	// Calculate Output File Path
-	std::string output_file_path = ""; //TODO
+	{
+		BinarySerializer serializer(SerializerAction::kWrite, "shader_effect.bin");
+		serializer << shader_effect;
+	}
+	{
+		ShaderEffect shader_effect2;
+		BinarySerializer serializer(SerializerAction::kRead, "shader_effect.bin");
+		serializer << shader_effect2;
+	}
 
-	StringBuffer out_defaults;
-	StringBuffer out_buffer;
-	GeneatePropertiesShaderCodeAndGetDefault(ast, data_buffer, out_defaults, out_buffer);
-
-	DOWork(ast, ST::PathManager::GetHFXDir() + "shader_effect.bin", SerializerAction::kWrite);
-	AST ast2;
-	DOWork(ast2, ST::PathManager::GetHFXDir() + "shader_effect.bin", SerializerAction::kRead);
+	// ShaderGenerator shader_generator(ast);
+	// shader_generator.GenerateShaders(ST::PathManager::GetHFXDir());
+	//
+	// // Calculate Output File Path
+	// std::string output_file_path = ""; //TODO
+	//
+	// StringBuffer out_defaults;
+	// StringBuffer out_buffer;
+	// GeneatePropertiesShaderCodeAndGetDefault(ast, data_buffer, out_defaults, out_buffer);
+	//
+	// DOWork(ast, ST::PathManager::GetHFXDir() + "shader_effect.bin", SerializerAction::kWrite);
+	// AST ast2;
+	// DOWork(ast2, ST::PathManager::GetHFXDir() + "shader_effect.bin", SerializerAction::kRead);
 }
 }
