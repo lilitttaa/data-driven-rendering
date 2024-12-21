@@ -6,6 +6,7 @@
 #include "GLFW/glfw3.h"
 #include "gtc/type_ptr.hpp"
 #include "HFX/HFX.h"
+#include "Serlalizer/Serializer.h"
 
 using namespace ST;
 
@@ -58,6 +59,7 @@ public:
 	virtual void Init() override
 	{
 		HFX::CompileHFX(PathManager::GetHFXDir() + "Ball.hfx");
+		TestSerializer();
 // glfw: initialize and configure
 		// ------------------------------
 		glfwInit();
@@ -279,3 +281,54 @@ public:
 };
 
 ST::Application* CreateApplication() { return new Example1(); }
+
+void Draw(graphics::Device& device)
+{
+	using namespace HFX;
+	using namespace graphics;
+	using graphics::ResourceList;
+	// Load shader effect file.
+	ShaderEffect shader_effect;
+
+	PipelineCreation compute_pipeline_creation;
+	PipelineCreation graphics_pipeline_creation;
+	ResourceListLayoutCreation resource_list_layout_creation = shader_effect.CreateResourceListLayoutCreation();
+	std::shared_ptr<ResourceListLayout> resource_list_layout = device.CreateResourceListLayout(resource_list_layout_creation);
+	TextureCreation texture_creation = TextureCreation(
+		512,
+		512,
+		TextureFormat::R8G8B8A8_UNORM,
+		"CheckerTexture"
+	);
+	std::shared_ptr<Texture> render_target = device.CreateTexture(texture_creation);
+	BufferCreation buffer_creation = BufferCreation(
+		BufferType::Constant,
+		ResourceUsageType::Dynamic,
+		shader_effect.GetLocalConstantsSize(),
+		"LocalConstants"
+	);
+	std::shared_ptr<Buffer> local_constant_buffer = device.CreateBuffer(buffer_creation);
+	ResourceListCreation graphics_resource_list_creation = ResourceListCreation();
+	std::shared_ptr<ResourceList> graphics_resource_list = device.CreateResourceList(graphics_resource_list_creation);
+	
+	ResourceListCreation compute_resource_list_creation = ResourceListCreation();
+	std::shared_ptr<ResourceList> compute_resource_list = device.CreateResourceList(compute_resource_list_creation);
+	std::shared_ptr<Pipeline> compute_pipeline = device.CreatePipeline(compute_pipeline_creation);
+	std::shared_ptr<Pipeline> graphics_pipeline = device.CreatePipeline(graphics_pipeline_creation);
+	std::shared_ptr<CommandBuffer> command_buffer = device.ResetCommandBuffer();
+	{
+		command_buffer->BeginSubmit();
+		command_buffer->BindPipeline(compute_pipeline);
+		command_buffer->BindResourceList(compute_resource_list);
+		command_buffer->Dispatch(texture_creation.width_ / 32, texture_creation.height_ / 32, 1);
+		command_buffer->EndSubmit();
+	}
+	{
+		command_buffer->BeginSubmit();
+		command_buffer->BindPipeline(graphics_pipeline);
+		command_buffer->BindResourceList(graphics_resource_list);
+		command_buffer->BindVertexBuffer(VertexBufferFactory::CreateFullScreenQuad(), 0, 0);
+		command_buffer->Draw(PrimitiveType::Triangle, 0, 3);
+		command_buffer->EndSubmit();
+	}
+}

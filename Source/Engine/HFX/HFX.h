@@ -259,8 +259,9 @@ struct CodeChunk
 	friend BinarySerializer& operator<<(BinarySerializer& serializer, CodeChunk& code_chunk);
 };
 
-struct ShaderEffect
+class ShaderEffect
 {
+public:
 	std::string name_;
 	std::vector<Pass> passes_;
 	std::vector<CodeChunk> code_chunks_;
@@ -271,6 +272,9 @@ struct ShaderEffect
 	friend BinarySerializer& operator<<(BinarySerializer& serializer, ShaderEffect& shader_effect);
 
 	friend std::ostream& operator<<(std::ostream& os, const ShaderEffect& shader_effect);
+
+	graphics::ResourceListLayoutCreation CreateResourceListLayoutCreation(){return graphics::ResourceListLayoutCreation();}
+	uint32_t GetLocalConstantsSize() const { return 0; }
 };
 
 #define INVALID_PROPERTY_DATA_INDEX 0xFFFFFFFF
