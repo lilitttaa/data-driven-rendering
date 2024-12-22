@@ -2,6 +2,11 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <vector>
+
+#include "vec4.hpp"
+#include "../../ThirdParty/glfw/deps/glad/gl.h"
+#include "code/Common/Win32DebugLogStream.h"
 
 namespace graphics
 {
@@ -30,7 +35,7 @@ enum class CullMode
 	kNone = 0, kFront, kBack, kCount
 };
 
-enum class FontCounterClockwise
+enum class FontCounterClockwise //TODO:rename
 {
 	kFalse = 0, kTrue, kCount
 };
@@ -153,6 +158,12 @@ enum class PrimitiveType
 	Unknown, Point, Line, Triangle, Patch, Count
 };
 
+enum class CommandType
+{
+	BindPipeline, BindResourceListLayout, BindVertexBuffer, BindIndexBuffer, BindResourceList, Draw, DrawIndexed, DrawInstanced, DrawIndexedInstanced,
+	Dispatch, CopyResource, SetScissor, SetViewport, Clear, ClearDepth, ClearStencil, BeginPass, EndPass, Count
+};
+
 struct RasterizationState
 {
 	CullMode cull_mode_;
@@ -214,13 +225,34 @@ class Texture
 {};
 
 class Buffer
-{};
+{
+public:
+	GLuint gl_handle_;
+};
 
 class Pipeline
 {};
 
 class ResourceList
 {};
+
+class Shader
+{};
+
+struct Rect2D
+{
+	float x = 0.0f;
+	float y = 0.0f;
+	float width = 0.0f;
+	float height = 0.0f;
+};
+
+struct Viewport
+{
+	Rect2D rect;
+	float min_depth = 0.0f;
+	float max_depth = 0.0f;
+};
 
 class VertexBufferFactory
 {
@@ -240,26 +272,37 @@ public:
 	void Dispatch(uint32_t group_x, uint32_t group_y, uint32_t group_z) {}
 };
 
+class Sampler
+{};
+
+class RenderPass
+{
+public:
+	GLuint fbo_handle_;
+	uint32_t is_swapchain_;
+};
+
 class ResourcePool
 {
 public:
 	using HandleType = uint32_t;
 	static const HandleType kInvalidHandle = 0xFFFFFFFF;
-	ResourcePool()
-	{
-		
-	}
+	ResourcePool() {}
+
 	HandleType AllocateResource()
 	{
-		if(current_head_count_ < max_count_)
+		if (current_head_count_ < max_count_)
 		{
+			//TODO
 			return current_head_count_++;
 		}
 	}
+
 	void ReleaseResource(HandleType handle)
 	{
-		
+		// TODO
 	}
+
 	void* AccessResource(HandleType handle) { return const_cast<void*>(static_cast<const ResourcePool*>(this)->AccessResource(handle)); }
 
 	const void* AccessResource(HandleType handle) const
@@ -273,6 +316,187 @@ protected:
 	uint32_t max_count_;
 	uint32_t resource_size_;
 	uint32_t current_head_count_;
+};
+
+class Device;
+
+class Command
+{
+public:
+	virtual void Execute(Device& Device) = 0;
+
+protected:
+	CommandType type_;
+};
+
+class BeginPassCommand : public Command
+{
+public:
+	virtual void Execute(Device& device) override;
+
+protected:
+	uint32_t handle_;
+};
+
+class EndPassCommand : public Command
+{
+public:
+	virtual void Execute(Device& device) override;
+};
+
+class BindVertexBufferCommand : public Command
+{
+public:
+	virtual void Execute(Device& device) override;
+
+protected:
+	uint32_t buffer_handle_;
+	uint32_t binding_;
+	uint32_t byte_offset_;
+};
+
+class BindIndexBufferCommand : public Command
+{
+public:
+	virtual void Execute(Device& device) override;
+
+protected:
+	uint32_t buffer_handle_;
+};
+
+class SetViewportCommand : public Command
+{
+public:
+	virtual void Execute(Device& device) override;
+
+protected:
+	Viewport viewport_;
+};
+
+class SetScissorCommand : public Command
+{
+public:
+	virtual void Execute(Device& device) override;
+
+protected:
+	Rect2D scissor_;
+};
+
+class ClearColorCommand : public Command
+{
+public:
+	virtual void Execute(Device& device) override;
+
+protected:
+	glm::vec4 clear_value_;
+};
+
+class ClearDepthCommand : public Command
+{
+public:
+	virtual void Execute(Device& device) override;
+
+protected:
+	float clear_value_;
+};
+
+class ClearStencilCommand : public Command
+{
+public:
+	virtual void Execute(Device& device) override;
+
+protected:
+	uint8_t clear_value_;
+};
+
+class BindPipelineCommand : public Command
+{
+public:
+	virtual void Execute(Device& device) override;
+
+protected:
+	uint32_t handle_;
+};
+
+class BindResourceListCommand : public Command
+{
+public:
+	virtual void Execute(Device& device) override;
+
+protected:
+	std::vector<uint32_t> handles_;
+	std::vector<uint32_t> offsets_;
+};
+
+class DispatchCommand : public Command
+{
+public:
+	virtual void Execute(Device& device) override;
+
+protected:
+	uint32_t group_count_x_;
+	uint32_t group_count_y_;
+	uint32_t group_count_z_;
+};
+
+class DrawCommand : public Command
+{
+public:
+	virtual void Execute(Device& device) override;
+
+protected:
+	PrimitiveType primitive_type_;
+	uint32_t first_vertex_;
+	uint32_t vertex_count_;
+	uint32_t instance_count_;
+};
+
+class DrawIndexedCommand : public Command
+{
+public:
+	virtual void Execute(Device& device) override;
+
+protected:
+	PrimitiveType primitive_type_;
+	uint32_t index_count_;
+	uint32_t instance_count_;
+	uint32_t first_index_;
+	uint32_t vertex_offset_;
+	uint32_t first_instance_;
+};
+
+class DeviceState
+{
+public:
+	void Apply();
+
+	const Viewport* viewport_;
+	const Rect2D* scissor_;
+	const Pipeline* pipeline_;
+	std::vector<const ResourceList*> resource_lists_;
+	std::vector<uint32_t> resource_offsets_;
+
+	glm::vec4 clear_color_value_;
+	float clear_depth_value_;
+	uint8_t clear_stencil_value_;
+	bool clear_color_flag_;
+	bool clear_depth_flag_;
+	bool clear_stencil_flag_;
+	GLuint fbo_handle_;
+	GLuint index_buffer_handle_;
+
+	struct VertexBufferBinding
+	{
+		GLuint vb_handle_;
+		uint32_t binding_;
+		uint32_t offset_;
+	};
+
+	std::vector<VertexBufferBinding> vertex_buffer_bindings_;
+	uint32_t vertex_streams_num_;
+
+	bool swapchain_flag_;
+	bool end_pass_flag_;
 };
 
 class Device
@@ -289,5 +513,38 @@ public:
 	std::shared_ptr<ResourceList> CreateResourceList(const ResourceListCreation& creation) { return std::make_shared<ResourceList>(); }
 	std::shared_ptr<Pipeline> CreatePipeline(const PipelineCreation& creation) { return std::make_shared<Pipeline>(); }
 	std::shared_ptr<CommandBuffer> ResetCommandBuffer() { return std::make_shared<CommandBuffer>(); }
+
+#pragma region AccessResource
+
+public:
+	Pipeline* AccessPipeline(uint32_t handle) { return static_cast<Pipeline*>(pipelines_.AccessResource(handle)); }
+	ResourceList* AccessResourceList(uint32_t handle) { return static_cast<ResourceList*>(resource_lists_.AccessResource(handle)); }
+	Buffer* AccessBuffer(uint32_t handle) { return static_cast<Buffer*>(buffers_.AccessResource(handle)); }
+	Texture* AccessTexture(uint32_t handle) { return static_cast<Texture*>(textures_.AccessResource(handle)); }
+	Shader* AccessShader(uint32_t handle) { return static_cast<Shader*>(shaders_.AccessResource(handle)); }
+
+	ResourceListLayout* AccessResourceListLayout(uint32_t handle)
+	{
+		return static_cast<ResourceListLayout*>(resource_list_layouts_.AccessResource(handle));
+	}
+
+	CommandBuffer* AccessCommandBuffer(uint32_t handle) { return static_cast<CommandBuffer*>(command_buffers_.AccessResource(handle)); }
+	Sampler* AccessSampler(uint32_t handle) { return static_cast<Sampler*>(samplers_.AccessResource(handle)); }
+	RenderPass* AccessRenderPass(uint32_t handle) { return static_cast<RenderPass*>(render_passes_.AccessResource(handle)); }
+
+protected:
+	ResourcePool buffers_;
+	ResourcePool textures_;
+	ResourcePool pipelines_;
+	ResourcePool samplers_;
+	ResourcePool resource_list_layouts_;
+	ResourcePool resource_lists_;
+	ResourcePool render_passes_;
+	ResourcePool command_buffers_;
+	ResourcePool shaders_;
+#pragma endregion
+
+public:
+	DeviceState device_state_; //TODO hide
 };
 }
